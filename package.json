@@ -1,0 +1,25 @@
+{
+  "name": "ai-study-assistant",
+  "version": "1.0.0",
+  "description": "Full-stack RAG app: upload lecture notes as a PDF, then chat with them, summarize them, and generate flashcards or quizzes — all grounded in the uploaded material.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yashrai0/ai-study-assistant.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Yashrai0/ai-study-assistant/issues"
+  },
+  "homepage": "https://github.com/Yashrai0/ai-study-assistant#readme",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

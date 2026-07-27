@@ -18,12 +18,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: backend/package-lock.json
 
       - run: npm ci --ignore-scripts
 
-      # Runs native node test runner directly without waiting for npx prompts
       - run: node --test test/chunker.test.js test/parseJson.test.js test/sanitizeFilename.test.js test/spacedRepetition.test.js test/vectorStore.test.js
         env:
           NODE_ENV: test
@@ -49,7 +46,7 @@ jobs:
           node-version: "20"
 
       - working-directory: frontend
-        run: npm ci --ignore-scripts
+        run: npm install
 
       - working-directory: frontend
         run: npm run build

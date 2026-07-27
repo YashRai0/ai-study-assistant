@@ -1,0 +1,6 @@
+# Railway (via Nixpacks) needs Ghostscript + GraphicsMagick installed at the
+# system level for OCR (pdf2pic rasterizes PDF pages into images before
+# tesseract.js reads them). Without this file, scanned-PDF uploads will fail
+# with an OCR error on Railway even though normal text PDFs work fine.
+[phases.setup]
+nixPkgs = ["ghostscript", "graphicsmagick"]

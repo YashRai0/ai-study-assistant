@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Env files — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+frontend/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS/editor cruft
+.DS_Store
+.vscode/
+.idea/
+
+# Local temp files from OCR/upload processing (backend uses os.tmpdir(), not
+# a project-local dir, but this guards against any local override)
+*.tmp

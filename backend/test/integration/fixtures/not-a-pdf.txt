@@ -1,0 +1,1 @@
+This is just a plain text file, renamed to .pdf in the test that uses it, to verify the magic-byte check rejects it.

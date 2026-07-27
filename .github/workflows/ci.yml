@@ -1,0 +1,68 @@
+# CI: runs the dependency-free backend unit tests and verifies both Docker
+# images actually build, on every push/PR to main.
+#
+# What this does NOT do: deploy anything. Vercel and Railway (per
+# DEPLOYMENT.md) each auto-deploy on push to main once connected to this
+# repo via their own GitHub integration — that's the "CD" half, handled by
+# them, not duplicated here. This workflow is a merge gate: tests and builds
+# must pass before code reaches main, which is what triggers their deploys.
+#
+# NOT VERIFIED BY AN ACTUAL RUN — this was written in a sandbox with no
+# network access to actually push to GitHub and watch Actions execute it.
+# Standard, well-worn action versions and steps, but push this and check the
+# Actions tab before assuming it's green.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-unit-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm install
+      # Only the dependency-free unit tests run here (vectorStore, chunker,
+      # sanitizeFilename, spacedRepetition, parseJson) — these were the ones
+      # actually verified during development. Integration tests
+      # (test:integration) need mongodb-memory-server + supertest and were
+      # never run end-to-end in this project's build environment; confirm
+      # them locally before wiring them into CI.
+      - run: npm test
+
+  backend-docker-build:
+    runs-on: ubuntu-latest
+    needs: backend-unit-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -t ai-study-assistant-backend:ci ./backend
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm install
+      - working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_URL: /api/v1
+      - name: Build frontend Docker image
+        run: docker build --build-arg VITE_API_URL=/api/v1 -t ai-study-assistant-frontend:ci ./frontend

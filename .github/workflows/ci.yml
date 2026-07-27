@@ -17,14 +17,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
           cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
-      # Runs only unit tests explicitly in the test root directory
-      - run: npx glob "test/*.test.js" | xargs node --test
+      # Runs native node test runner directly without waiting for npx prompts
+      - run: node --test test/chunker.test.js test/parseJson.test.js test/sanitizeFilename.test.js test/spacedRepetition.test.js test/vectorStore.test.js
         env:
           NODE_ENV: test
           JWT_SECRET: dev_jwt_secret_12345
@@ -46,10 +46,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
 
       - working-directory: frontend
-        run: npm install
+        run: npm ci --ignore-scripts
 
       - working-directory: frontend
         run: npm run build

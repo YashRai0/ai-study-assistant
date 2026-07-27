@@ -19,39 +19,36 @@ import analyticsRouter from "./src/routes/analytics.js";
 import studyPlanRouter from "./src/routes/studyPlan.js";
 import groupsRouter from "./src/routes/groups.js";
 
-// The Express app itself, separated from server.js's "connect to the real
-// DB and start listening" logic — this file exports just the app so
-// integration tests can import it directly, wire it up to a test database
-// (mongodb-memory-server), and drive requests through it with supertest,
-// without needing an actual running server process or the production
-// MongoDB connection.
 const app = express();
 
-// Security headers (X-Frame-Options, X-Content-Type-Options, etc.).
-// CSP (Content-Security-Policy) is explicitly disabled here rather than left
-// on helmet's HTML-oriented defaults: this backend only ever returns JSON,
-// never renders HTML, so a CSP header on these responses doesn't restrict
-// anything meaningful — CSP governs what a browser is allowed to load/run
-// when rendering a page, and this server never serves one. If this backend
-// ever starts serving HTML directly (e.g. server-rendering something,
-// rather than staying an API consumed by the separately-hosted frontend),
-// revisit this and configure real directives instead of disabling it.
+// Security headers
 app.use(helmet({ contentSecurityPolicy: false }));
+
+// Allowed origins for CORS (supports comma-separated origins from ENV or localhost fallback)
+const rawOrigins = process.env.CLIENT_URL || process.env.CORS_ORIGIN || "http://localhost:5173";
+const allowedOrigins = rawOrigins.split(",").map((url) => url.trim());
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",") || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or Postman)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked request from origin: ${origin}`));
+      }
+    },
+    credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(requestId);
 app.use(generalLimiter);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
-// API versioned under /v1 so future breaking changes don't have to break
-// existing clients — new versions can be mounted alongside this one instead
-// of replacing it.
+// API versioned under /v1
 const v1 = express.Router();
 v1.use("/auth", authRouter);
 v1.use("/upload", uploadRouter);
@@ -67,7 +64,7 @@ v1.use("/study-plan", studyPlanRouter);
 v1.use("/groups", groupsRouter);
 app.use("/api/v1", v1);
 
-// Central error handler (e.g. multer file-type/size rejections)
+// Central error handler
 app.use((err, req, res, next) => {
   if (err.message === "INVALID_FILE_TYPE") {
     return res.status(400).json({ error: "Only PDF files are supported." });

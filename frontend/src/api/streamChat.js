@@ -7,6 +7,14 @@ import { API_BASE_URL, TOKEN_KEY } from "./client.js";
  * ReadableStream rather than axios or the native EventSource API — axios
  * doesn't expose incremental chunks in the browser the way this needs, and
  * EventSource only supports GET requests, not a POST with a JSON body.
+ *
+ * Because this bypasses axios entirely, it also bypasses the 401 response
+ * interceptor set up in client.js — that interceptor only runs for
+ * requests made through the axios `client` instance, not raw fetch calls.
+ * The same expired/invalid-token handling is duplicated here so a stale
+ * token during an active chat doesn't just show an inline error; it clears
+ * the token and sends the user back to /login, consistent with every other
+ * API call in the app.
  */
 export async function streamChatRequest(path, body, { onToken } = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -20,6 +28,17 @@ export async function streamChatRequest(path, body, { onToken } = {}) {
   });
 
   if (!response.ok || !response.body) {
+    if (response.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      // The redirect above is async (navigation), so still throw to stop
+      // the caller from treating this as a normal response while the
+      // redirect is in flight.
+      throw new Error("Your session has expired. Please log in again.");
+    }
+
     let errorMessage = "Something went wrong. Please try again.";
     try {
       const data = await response.json();

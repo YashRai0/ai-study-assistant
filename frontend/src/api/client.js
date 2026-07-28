@@ -15,4 +15,33 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+// If the backend ever rejects a request as unauthorized (expired/invalid
+// token, or the token was cleared some other way), stop the app in its
+// tracks instead of letting protected pages hang on a request that will
+// never succeed. This complements the one-time check in AuthContext's
+// useEffect (which only runs on initial mount) by catching a 401 that
+// happens *during* an active session — e.g. the token expires while the
+// user is mid-way through using the app.
+//
+// This lives here (not in AuthContext) because any component using
+// `client` benefits automatically, without each one needing its own
+// try/catch for the 401 case.
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      // Full reload (not a react-router navigate) so AuthProvider's mount
+      // logic re-runs cleanly from a known-good state, and any in-flight
+      // component state tied to the now-invalid session is discarded
+      // rather than patched around. Guard against a redirect loop if the
+      // 401 happens to originate from the login page itself.
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default client;

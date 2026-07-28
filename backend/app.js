@@ -20,6 +20,7 @@ import studyPlanRouter from "./src/routes/studyPlan.js";
 import groupsRouter from "./src/routes/groups.js";
 
 const app = express();
+app.set("trust proxy", 1);
 
 // Security headers
 app.use(helmet({ contentSecurityPolicy: false }));

@@ -7,9 +7,14 @@ export default function Dashboard() {
   const [pdfs, setPdfs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const [recentChats, setRecentChats] = useState([]);
 
   useEffect(() => {
     loadPdfs();
+    client
+      .get("/chat/recent")
+      .then(({ data }) => setRecentChats(data.recent))
+      .catch(() => setRecentChats([]));
   }, []);
 
   function loadPdfs() {
@@ -94,6 +99,30 @@ export default function Dashboard() {
           </ul>
         )}
       </div>
+
+      {recentChats.length > 0 && (
+        <section className="mt-10">
+          <h2 className="font-display text-xl font-semibold text-ink-900">Recent chats</h2>
+          <ul className="mt-4 space-y-2">
+            {recentChats.map((c, i) => (
+              <li key={i}>
+                <Link
+                  to={`/chat/${c.pdfId}`}
+                  className="flex items-center justify-between rounded-xl border border-ink-100 bg-white/70 px-4 py-3 hover:border-highlight"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-ink-900">{c.content}</p>
+                    <p className="text-xs text-ink-400">{c.filename}</p>
+                  </div>
+                  <span className="ml-4 shrink-0 text-xs text-ink-400">
+                    {new Date(c.ts).toLocaleDateString()}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

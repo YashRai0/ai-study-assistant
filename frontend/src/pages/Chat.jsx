@@ -18,6 +18,7 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [readAloud, setReadAloud] = useState(false);
+  const [explainMode, setExplainMode] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -42,15 +43,19 @@ export default function Chat() {
     setMessages((prev) => [...prev, { role: "assistant", content: "", ts: Date.now() }]);
 
     try {
-      const full = await streamChatRequest(`/chat/${pdfId}`, { message }, {
-        onToken: (_token, accumulated) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...updated[updated.length - 1], content: accumulated };
-            return updated;
-          });
-        },
-      });
+      const full = await streamChatRequest(
+        `/chat/${pdfId}`,
+        { message, mode: explainMode ? "explain" : "chat" },
+        {
+          onToken: (_token, accumulated) => {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { ...updated[updated.length - 1], content: accumulated };
+              return updated;
+            });
+          },
+        }
+      );
       if (readAloud) speak(full);
     } catch (err) {
       setMessages((prev) => {
@@ -77,6 +82,10 @@ export default function Chat() {
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold text-ink-900">Chat with your notes</h1>
         <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-ink-400">
+            <input type="checkbox" checked={explainMode} onChange={(e) => setExplainMode(e.target.checked)} />
+            Explain simply
+          </label>
           {speechSupported() && (
             <label className="flex items-center gap-2 text-sm text-ink-400">
               <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} />
@@ -119,6 +128,12 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
+      {explainMode && (
+        <p className="mt-2 inline-block w-fit rounded-full bg-highlight/20 px-3 py-1 text-xs text-ink-900">
+          Explain-simply mode: answers use plain language and everyday analogies
+        </p>
+      )}
+
       {voiceError && <p className="mt-2 text-sm text-red-600">{voiceError}</p>}
 
       <form
@@ -139,7 +154,11 @@ export default function Chat() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask a question about your notes, or tap 🎤 to speak…"
+          placeholder={
+            explainMode
+              ? "Ask something you want explained simply, or tap 🎤…"
+              : "Ask a question about your notes, or tap 🎤 to speak…"
+          }
           className="flex-1 rounded-full border border-ink-100 bg-white px-5 py-3 outline-none focus:border-highlight"
         />
         <button

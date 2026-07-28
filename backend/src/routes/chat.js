@@ -15,6 +15,29 @@ const router = Router();
 router.use(requireAuth);
 router.use(aiLimiter);
 
+// Recent chat questions across ALL of the user's PDFs — powers the
+// Dashboard's "Recent chats" feed. Only "user" messages (the questions
+// asked, not the answers) since that's what's meaningful to show as an
+// activity feed entry.
+router.get("/recent", async (req, res) => {
+  const messages = await ChatMessage.find({ owner: req.user.id, role: "user" })
+    .sort({ ts: -1 })
+    .limit(5)
+    .populate("pdf", "filename")
+    .lean();
+
+  res.json({
+    recent: messages
+      .filter((m) => m.pdf) // guard against a dangling reference if the PDF was since deleted
+      .map((m) => ({
+        pdfId: m.pdf._id,
+        filename: m.pdf.filename,
+        content: m.content,
+        ts: m.ts,
+      })),
+  });
+});
+
 // Streams the answer as Server-Sent Events instead of waiting for the full
 // response: each event is `data: {"token": "..."}\n\n`, ending with
 // `data: {"done": true}\n\n`. The frontend reads this via fetch + a

@@ -49,7 +49,6 @@ export default function Review() {
       setFlipped(false);
       setIndex((i) => i + 1);
     } catch {
-      // best-effort — move on regardless so a blip doesn't stall the session
       setFlipped(false);
       setIndex((i) => i + 1);
     } finally {
@@ -113,7 +112,7 @@ export default function Review() {
           </p>
 
           {flipped ? (
-            <div className="mt-6 grid grid-cols-4 gap-2">
+            <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {RATINGS.map((r) => (
                 <button
                   key={r.label}
@@ -126,7 +125,7 @@ export default function Review() {
               ))}
             </div>
           ) : (
-            <div className="mt-6 h-12" /> // keeps layout stable before flip, avoiding a jump
+            <div className="mt-6 h-12" />
           )}
         </>
       )}

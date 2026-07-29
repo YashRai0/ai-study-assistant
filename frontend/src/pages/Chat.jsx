@@ -37,9 +37,6 @@ export default function Chat() {
     setInput("");
     setSending(true);
 
-    // A placeholder assistant message that fills in progressively as tokens
-    // arrive, instead of a single "Thinking..." indicator that's replaced
-    // all at once when the full answer comes back.
     setMessages((prev) => [...prev, { role: "assistant", content: "", ts: Date.now() }]);
 
     try {
@@ -79,9 +76,9 @@ export default function Chat() {
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col px-6 py-8" style={{ minHeight: "calc(100vh - 72px)" }}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl font-semibold text-ink-900">Chat with your notes</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-ink-400">
             <input type="checkbox" checked={explainMode} onChange={(e) => setExplainMode(e.target.checked)} />
             Explain simply

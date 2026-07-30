@@ -39,6 +39,12 @@ router.post("/", validate(multiChatMessageSchema), async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
+
+    // Same reasoning as chat.js: without this, an abandoned request kept the
+    // Groq stream running server-side to completion for nothing.
+    const controller = new AbortController();
+    req.on("close", () => controller.abort());
+
     const sendToken = (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`);
 
     let fullAnswer;
@@ -60,9 +66,11 @@ router.post("/", validate(multiChatMessageSchema), async (req, res) => {
         fullAnswer = "I couldn't find this information in your uploaded notes.";
         sendToken(fullAnswer);
       } else {
-        fullAnswer = await streamAnswerAcrossNotes(message, topChunks, sendToken);
+        fullAnswer = await streamAnswerAcrossNotes(message, topChunks, sendToken, controller.signal);
       }
     }
+
+    if (controller.signal.aborted) return;
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();

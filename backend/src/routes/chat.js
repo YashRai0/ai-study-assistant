@@ -15,29 +15,6 @@ const router = Router();
 router.use(requireAuth);
 router.use(aiLimiter);
 
-// Recent chat questions across ALL of the user's PDFs — powers the
-// Dashboard's "Recent chats" feed. Only "user" messages (the questions
-// asked, not the answers) since that's what's meaningful to show as an
-// activity feed entry.
-router.get("/recent", async (req, res) => {
-  const messages = await ChatMessage.find({ owner: req.user.id, role: "user" })
-    .sort({ ts: -1 })
-    .limit(5)
-    .populate("pdf", "filename")
-    .lean();
-
-  res.json({
-    recent: messages
-      .filter((m) => m.pdf) // guard against a dangling reference if the PDF was since deleted
-      .map((m) => ({
-        pdfId: m.pdf._id,
-        filename: m.pdf.filename,
-        content: m.content,
-        ts: m.ts,
-      })),
-  });
-});
-
 // Streams the answer as Server-Sent Events instead of waiting for the full
 // response: each event is `data: {"token": "..."}\n\n`, ending with
 // `data: {"done": true}\n\n`. The frontend reads this via fetch + a
@@ -60,6 +37,14 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
 
+    // Without this, closing the tab or navigating away mid-answer left the
+    // Groq stream running to completion on the server regardless — burning
+    // API quota and cost for a response nobody would ever read. `close`
+    // fires on both a clean end and an abrupt disconnect, so this covers
+    // either case.
+    const controller = new AbortController();
+    req.on("close", () => controller.abort());
+
     const sendToken = (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`);
 
     // If even the best match is a weak one, don't hand the LLM a strained
@@ -70,10 +55,15 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
       fullAnswer = "I couldn't find this information in your uploaded notes.";
       sendToken(fullAnswer);
     } else if (mode === "explain") {
-      fullAnswer = await streamExplainSimply(message, topChunks, sendToken);
+      fullAnswer = await streamExplainSimply(message, topChunks, sendToken, controller.signal);
     } else {
-      fullAnswer = await streamAnswerFromNotes(message, topChunks, sendToken);
+      fullAnswer = await streamAnswerFromNotes(message, topChunks, sendToken, controller.signal);
     }
+
+    // If the client disconnected mid-stream, there's no one to send the
+    // closing SSE event to, and the answer is incomplete — skip both the
+    // final write and saving a half-formed response to history.
+    if (controller.signal.aborted) return;
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();

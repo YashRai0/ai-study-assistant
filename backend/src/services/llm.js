@@ -35,19 +35,27 @@ async function complete(systemPrompt, userPrompt) {
  * the full accumulated text at the end, so callers can save it to history
  * exactly like the non-streaming path does.
  */
-async function streamComplete(systemPrompt, userPrompt, onToken) {
-  const stream = await groq.chat.completions.create({
-    model: MODEL,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.3,
-    stream: true,
-  });
+async function streamComplete(systemPrompt, userPrompt, onToken, signal) {
+  const stream = await groq.chat.completions.create(
+    {
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+      stream: true,
+    },
+    { signal }
+  );
 
   let full = "";
   for await (const chunk of stream) {
+    // Belt-and-suspenders: `signal` passed above should make Groq stop
+    // sending further chunks once aborted, but a chunk already in flight
+    // when abort() fires can still arrive — checking here avoids writing
+    // one more token to a response the client is no longer reading.
+    if (signal?.aborted) break;
     const token = chunk.choices?.[0]?.delta?.content || "";
     if (token) {
       full += token;
@@ -150,9 +158,9 @@ export async function answerFromNotes(question, contextChunks) {
 }
 
 /** Streaming variant of answerFromNotes — same prompt, tokens delivered via onToken. */
-export async function streamAnswerFromNotes(question, contextChunks, onToken) {
+export async function streamAnswerFromNotes(question, contextChunks, onToken, signal) {
   const { system, user } = buildAnswerFromNotesPrompt(question, contextChunks);
-  return streamComplete(system, user, onToken);
+  return streamComplete(system, user, onToken, signal);
 }
 
 /** Explain-like-I'm-a-beginner mode. */
@@ -162,9 +170,9 @@ export async function explainSimply(topic, contextChunks) {
 }
 
 /** Streaming variant of explainSimply. */
-export async function streamExplainSimply(topic, contextChunks, onToken) {
+export async function streamExplainSimply(topic, contextChunks, onToken, signal) {
   const { system, user } = buildExplainSimplyPrompt(topic, contextChunks);
-  return streamComplete(system, user, onToken);
+  return streamComplete(system, user, onToken, signal);
 }
 
 /**
@@ -179,9 +187,9 @@ export async function answerAcrossNotes(question, contextChunks) {
 }
 
 /** Streaming variant of answerAcrossNotes. */
-export async function streamAnswerAcrossNotes(question, contextChunks, onToken) {
+export async function streamAnswerAcrossNotes(question, contextChunks, onToken, signal) {
   const { system, user } = buildAnswerAcrossNotesPrompt(question, contextChunks);
-  return streamComplete(system, user, onToken);
+  return streamComplete(system, user, onToken, signal);
 }
 
 /** Summary generator: short / medium / bullets / exam-notes. Handles long PDFs via map-reduce. */

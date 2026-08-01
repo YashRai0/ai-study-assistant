@@ -35,7 +35,7 @@ router.post("/", validate(searchSchema), async (req, res) => {
     const filter = { owner: req.user.id };
     if (subject && subject !== "All subjects") filter.subject = subject;
 
-    const chunks = await Chunk.find(filter).select("text page filename subject embedding").lean();
+    const chunks = await Chunk.find(filter).select("pdf text page filename subject embedding").lean();
     if (chunks.length === 0) {
       return res.json({ results: [] });
     }

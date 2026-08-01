@@ -1,4 +1,12 @@
 import "dotenv/config";
+// Must be imported before any router is created/used: this patches Express's
+// router methods so a rejected promise inside an async route handler is
+// automatically forwarded to the error-handling middleware below, instead of
+// becoming an unhandled rejection that can crash the whole process. This is
+// the fix for the "Cast to ObjectId failed... Crashed" incident — routes
+// like GET /:pdfId/history had no try/catch, and Express 4 doesn't catch
+// async errors on its own the way Express 5 does.
+import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -72,6 +80,13 @@ app.use((err, req, res, next) => {
   }
   if (err.code === "LIMIT_FILE_SIZE") {
     return res.status(400).json({ error: "File is too large. Maximum size is 20MB." });
+  }
+  // Mongoose throws CastError when a route param that's supposed to be an
+  // ObjectId isn't one (e.g. a stale/bad frontend request sending the
+  // literal string "undefined" as an ID) — this is a bad-input problem the
+  // client can act on, not a server fault, so 400 rather than 500.
+  if (err.name === "CastError") {
+    return res.status(400).json({ error: "That ID doesn't look valid. Please try again." });
   }
   logger.error({ reqId: req.id, err }, "Unhandled error");
   res.status(500).json({ error: "Unexpected server error." });

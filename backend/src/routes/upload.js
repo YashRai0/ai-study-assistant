@@ -16,8 +16,10 @@ import Pdf from "../models/Pdf.js";
 import Chunk from "../models/Chunk.js";
 import ChatMessage from "../models/ChatMessage.js";
 import logger from "../utils/logger.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = Router();
+router.param("pdfId", validateObjectIdParam);
 
 // Disk storage instead of memoryStorage: multer streams the incoming file
 // straight to a temp file as bytes arrive off the network, rather than

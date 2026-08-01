@@ -6,10 +6,12 @@ import { validate } from "../middleware/validate.js";
 import { summarySchema } from "../validation/schemas.js";
 import Pdf from "../models/Pdf.js";
 import logger from "../utils/logger.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = Router();
 router.use(requireAuth);
 router.use(aiLimiter);
+router.param("pdfId", validateObjectIdParam);
 
 router.post("/:pdfId", validate(summarySchema), async (req, res) => {
   const { style } = req.body;

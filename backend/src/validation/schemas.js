@@ -118,7 +118,15 @@ export const joinGroupSchema = z.object({
 });
 
 export const shareToGroupSchema = z.object({
-  pdfId: z.string().trim().min(1, "A PDF is required."),
+  // Same underlying risk as the route-param IDs (see validateObjectId.js) —
+  // this pdfId arrives in the request body instead of a route param, so
+  // router.param() can't catch it; the format check has to live in the
+  // schema itself instead.
+  pdfId: z
+    .string()
+    .trim()
+    .min(1, "A PDF is required.")
+    .regex(/^[0-9a-fA-F]{24}$/, "Invalid PDF reference."),
 });
 
 export const groupChatMessageSchema = z.object({

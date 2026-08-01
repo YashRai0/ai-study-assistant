@@ -19,9 +19,12 @@ import GroupChatMessage from "../models/GroupChatMessage.js";
 import Pdf from "../models/Pdf.js";
 import Chunk from "../models/Chunk.js";
 import logger from "../utils/logger.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = Router();
 router.use(requireAuth);
+router.param("groupId", validateObjectIdParam);
+router.param("pdfId", validateObjectIdParam);
 
 function generateInviteCode() {
   // 6 uppercase alphanumeric chars, no ambiguous 0/O/1/I — easy to read aloud
@@ -211,6 +214,10 @@ router.post("/:groupId/chat", requireMembership, aiLimiter, validate(groupChatMe
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
+    const controller = new AbortController();
+    req.on("close", () => {
+      if (!res.writableEnded) controller.abort();
+    });
     const sendToken = (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`);
 
     let fullAnswer;
@@ -218,11 +225,13 @@ router.post("/:groupId/chat", requireMembership, aiLimiter, validate(groupChatMe
       fullAnswer = "I couldn't find this information in the notes shared with this group.";
       sendToken(fullAnswer);
     } else {
-      fullAnswer = await streamAnswerAcrossNotes(message, topChunks, sendToken);
+      fullAnswer = await streamAnswerAcrossNotes(message, topChunks, sendToken, controller.signal);
     }
 
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-    res.end();
+    if (!controller.signal.aborted) {
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    }
 
     await GroupChatMessage.create({ group: req.group._id, author: req.user.id, role: "user", content: message });
     await GroupChatMessage.create({ group: req.group._id, author: req.user.id, role: "assistant", content: fullAnswer });

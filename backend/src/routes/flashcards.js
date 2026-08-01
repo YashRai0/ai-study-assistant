@@ -9,9 +9,12 @@ import { extractAndValidateJson } from "../utils/parseJson.js";
 import Pdf from "../models/Pdf.js";
 import Flashcard from "../models/Flashcard.js";
 import logger from "../utils/logger.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = Router();
 router.use(requireAuth);
+router.param("pdfId", validateObjectIdParam);
+router.param("cardId", validateObjectIdParam);
 
 // Generates flashcards for a PDF and PERSISTS them (previously these were
 // only ever held in React state and thrown away on refresh) — spaced

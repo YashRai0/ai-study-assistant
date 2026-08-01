@@ -10,9 +10,11 @@ import Pdf from "../models/Pdf.js";
 import QuizAttempt from "../models/QuizAttempt.js";
 import StudyPlan from "../models/StudyPlan.js";
 import logger from "../utils/logger.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = Router();
 router.use(requireAuth);
+router.param("planId", validateObjectIdParam);
 
 const ALL_SCOPE = "All subjects";
 const DEFAULT_DAYS = 7;

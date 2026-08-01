@@ -9,6 +9,7 @@ import { extractAndValidateJson } from "../utils/parseJson.js";
 import Pdf from "../models/Pdf.js";
 import QuizAttempt from "../models/QuizAttempt.js";
 import logger from "../utils/logger.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const attemptSchema = z.object({
   score: z.number().int().min(0),
@@ -18,6 +19,7 @@ const attemptSchema = z.object({
 const router = Router();
 router.use(requireAuth);
 router.use(aiLimiter);
+router.param("pdfId", validateObjectIdParam);
 
 router.post("/:pdfId", validate(quizSchema), async (req, res) => {
   const { mcq, trueFalse, shortAnswer } = req.body;

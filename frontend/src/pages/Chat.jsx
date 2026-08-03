@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import client from "../api/client.js";
 import { streamChatRequest } from "../api/streamChat.js";
 import VoiceInput from "../components/VoiceInput.jsx";
+import StudyFlowNav from "../components/StudyFlowNav.jsx";
 import { speak, speechSupported } from "../utils/speech.js";
 
 const SUGGESTIONS = [
@@ -17,9 +18,11 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [readAloud, setReadAloud] = useState(false);
   const [explainMode, setExplainMode] = useState(false);
   const bottomRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     client.get(`/chat/${pdfId}/history`).then(({ data }) => setMessages(data.history || []));
@@ -39,11 +42,15 @@ export default function Chat() {
 
     setMessages((prev) => [...prev, { role: "assistant", content: "", ts: Date.now() }]);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const full = await streamChatRequest(
         `/chat/${pdfId}`,
         { message, mode: explainMode ? "explain" : "chat" },
         {
+          signal: controller.signal,
           onToken: (_token, accumulated) => {
             setMessages((prev) => {
               const updated = [...prev];
@@ -66,17 +73,27 @@ export default function Chat() {
       });
     } finally {
       setSending(false);
+      abortControllerRef.current = null;
     }
   }
 
+  function stopGenerating() {
+    abortControllerRef.current?.abort();
+  }
+
   async function clearChat() {
-    await client.delete(`/chat/${pdfId}/history`);
-    setMessages([]);
+    try {
+      await client.delete(`/chat/${pdfId}/history`);
+      setMessages([]);
+    } catch {
+      setActionError("Couldn't clear the chat right now. Please try again.");
+    }
   }
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col px-6 py-8" style={{ minHeight: "calc(100vh - 72px)" }}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <StudyFlowNav pdfId={pdfId} current="chat" />
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl font-semibold text-ink-900">Chat with your notes</h1>
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-ink-400">
@@ -132,6 +149,7 @@ export default function Chat() {
       )}
 
       {voiceError && <p className="mt-2 text-sm text-red-600">{voiceError}</p>}
+      {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
 
       <form
         onSubmit={(e) => {
@@ -156,14 +174,15 @@ export default function Chat() {
               ? "Ask something you want explained simply, or tap 🎤…"
               : "Ask a question about your notes, or tap 🎤 to speak…"
           }
+          aria-label="Message"
           className="flex-1 rounded-full border border-ink-100 bg-white px-5 py-3 outline-none focus:border-highlight"
         />
         <button
-          type="submit"
-          disabled={sending}
-          className="rounded-full bg-ink-900 px-6 py-3 text-paper disabled:opacity-50"
+          type={sending ? "button" : "submit"}
+          onClick={sending ? stopGenerating : undefined}
+          className="rounded-full bg-ink-900 px-6 py-3 text-paper"
         >
-          Send
+          {sending ? "Stop" : "Send"}
         </button>
       </form>
     </main>

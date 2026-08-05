@@ -19,7 +19,6 @@ export default function MultiChat() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [voiceError, setVoiceError] = useState("");
-  const [actionError, setActionError] = useState("");
   const [readAloud, setReadAloud] = useState(false);
   const bottomRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -94,12 +93,8 @@ export default function MultiChat() {
   }
 
   async function clearChat() {
-    try {
-      await client.delete("/multi-chat/history", { params: { scope } });
-      setMessages([]);
-    } catch {
-      setActionError("Couldn't clear the chat right now. Please try again.");
-    }
+    await client.delete("/multi-chat/history", { params: { scope } });
+    setMessages([]);
   }
 
   return (
@@ -174,7 +169,6 @@ export default function MultiChat() {
       </div>
 
       {voiceError && <p className="mt-2 text-sm text-red-600">{voiceError}</p>}
-      {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
 
       <form
         onSubmit={(e) => {
@@ -195,7 +189,6 @@ export default function MultiChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={`Ask something about ${scope === ALL_SCOPE ? "all your notes" : scope}, or tap 🎤…`}
-          aria-label="Message"
           className="flex-1 rounded-full border border-ink-100 bg-white px-5 py-3 outline-none focus:border-highlight"
         />
         <button

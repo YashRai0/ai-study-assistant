@@ -1,29 +1,41 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
 import client from "../api/client.js";
 import { streamChatRequest } from "../api/streamChat.js";
 import VoiceInput from "../components/VoiceInput.jsx";
 import { speak, speechSupported } from "../utils/speech.js";
 
+const ALL_SCOPE = "All subjects";
+
 const SUGGESTIONS = [
-  "Summarize the main idea of this chapter",
-  "Explain the hardest concept here simply",
-  "What are the key terms I should know?",
+  "What topics show up across all my notes?",
+  "Compare how two of my subjects define the same term",
+  "What should I review first before my exams?",
 ];
 
-export default function Chat() {
-  const { pdfId } = useParams();
+export default function MultiChat() {
+  const [subjects, setSubjects] = useState([]);
+  const [scope, setScope] = useState(ALL_SCOPE);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [readAloud, setReadAloud] = useState(false);
-  const [explainMode, setExplainMode] = useState(false);
   const bottomRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
-    client.get(`/chat/${pdfId}/history`).then(({ data }) => setMessages(data.history || []));
-  }, [pdfId]);
+    client
+      .get("/search/subjects")
+      .then(({ data }) => setSubjects(data.subjects))
+      .catch(() => setSubjects([]));
+  }, []);
+
+  useEffect(() => {
+    client
+      .get("/multi-chat/history", { params: { scope } })
+      .then(({ data }) => setMessages(data.history || []));
+  }, [scope]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,13 +49,20 @@ export default function Chat() {
     setInput("");
     setSending(true);
 
+    // A placeholder assistant message that fills in progressively as tokens
+    // arrive, instead of a single "Thinking..." indicator replaced all at
+    // once when the full answer comes back.
     setMessages((prev) => [...prev, { role: "assistant", content: "", ts: Date.now() }]);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const full = await streamChatRequest(
-        `/chat/${pdfId}`,
-        { message, mode: explainMode ? "explain" : "chat" },
+        "/multi-chat",
+        { message, scope },
         {
+          signal: controller.signal,
           onToken: (_token, accumulated) => {
             setMessages((prev) => {
               const updated = [...prev];
@@ -66,33 +85,62 @@ export default function Chat() {
       });
     } finally {
       setSending(false);
+      abortControllerRef.current = null;
     }
   }
 
+  function stopGenerating() {
+    abortControllerRef.current?.abort();
+  }
+
   async function clearChat() {
-    await client.delete(`/chat/${pdfId}/history`);
-    setMessages([]);
+    try {
+      await client.delete("/multi-chat/history", { params: { scope } });
+      setMessages([]);
+    } catch {
+      setActionError("Couldn't clear the chat right now. Please try again.");
+    }
   }
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col px-6 py-8" style={{ minHeight: "calc(100vh - 72px)" }}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="font-display text-2xl font-semibold text-ink-900">Chat with your notes</h1>
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-ink-400">
-            <input type="checkbox" checked={explainMode} onChange={(e) => setExplainMode(e.target.checked)} />
-            Explain simply
-          </label>
-          {speechSupported() && (
-            <label className="flex items-center gap-2 text-sm text-ink-400">
-              <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} />
-              Read answers aloud
-            </label>
-          )}
-          <button onClick={clearChat} className="text-sm text-ink-400 hover:text-ink-900">
-            Clear chat
-          </button>
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-ink-900">Chat across all your notes</h1>
+          <p className="text-sm text-ink-400">Answers are drawn from every PDF in the scope below, not just one.</p>
         </div>
+        <button onClick={clearChat} className="self-start text-sm text-ink-400 hover:text-ink-900 sm:self-auto">
+          Clear chat
+        </button>
+      </div>
+
+      {speechSupported() && (
+        <label className="mt-2 flex items-center gap-2 text-sm text-ink-400">
+          <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} />
+          Read answers aloud
+        </label>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          onClick={() => setScope(ALL_SCOPE)}
+          className={`rounded-full px-4 py-2 text-sm ${
+            scope === ALL_SCOPE ? "bg-ink-900 text-paper" : "border border-ink-100 text-ink-600"
+          }`}
+        >
+          All subjects
+        </button>
+        {subjects.map((s) => (
+          <button
+            key={s}
+            onClick={() => setScope(s)}
+            className={`rounded-full px-4 py-2 text-sm ${
+              scope === s ? "bg-ink-900 text-paper" : "border border-ink-100 text-ink-600"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
       </div>
 
       <div className="mt-6 flex-1 space-y-4 overflow-y-auto">
@@ -125,13 +173,8 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
-      {explainMode && (
-        <p className="mt-2 inline-block w-fit rounded-full bg-highlight/20 px-3 py-1 text-xs text-ink-900">
-          Explain-simply mode: answers use plain language and everyday analogies
-        </p>
-      )}
-
       {voiceError && <p className="mt-2 text-sm text-red-600">{voiceError}</p>}
+      {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
 
       <form
         onSubmit={(e) => {
@@ -151,19 +194,16 @@ export default function Chat() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            explainMode
-              ? "Ask something you want explained simply, or tap 🎤…"
-              : "Ask a question about your notes, or tap 🎤 to speak…"
-          }
+          placeholder={`Ask something about ${scope === ALL_SCOPE ? "all your notes" : scope}, or tap 🎤…`}
+          aria-label="Message"
           className="flex-1 rounded-full border border-ink-100 bg-white px-5 py-3 outline-none focus:border-highlight"
         />
         <button
-          type="submit"
-          disabled={sending}
-          className="rounded-full bg-ink-900 px-6 py-3 text-paper disabled:opacity-50"
+          type={sending ? "button" : "submit"}
+          onClick={sending ? stopGenerating : undefined}
+          className="rounded-full bg-ink-900 px-6 py-3 text-paper"
         >
-          Send
+          {sending ? "Stop" : "Send"}
         </button>
       </form>
     </main>

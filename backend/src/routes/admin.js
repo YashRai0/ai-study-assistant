@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { uploadPdfQueue, embedChunksQueue, ocrQueue, synthesisQueue } from "../services/queues.js";
 import { requireAuth } from "../middleware/auth.js";
-import { logger } from "../services/logger.js";
+import logger from "../utils/logger.js";
 
 const router = Router();
 router.use(requireAuth);

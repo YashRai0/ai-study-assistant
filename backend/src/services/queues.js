@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
 import { getRedis } from "./redis.js";
-import { logger } from "./logger.js";
+import logger from "../utils/logger.js";
 
 /**
  * BullMQ Queues for async background jobs.

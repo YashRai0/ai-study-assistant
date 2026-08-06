@@ -10,7 +10,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { uploadLimiter } from "../middleware/rateLimit.js";
 import { sanitizeFilename } from "../utils/sanitizeFilename.js";
 import { uploadPdfQueue, embedChunksQueue, synthesisQueue, enqueueJob, waitForJob } from "../services/queues.js";
-import { logger } from "../services/logger.js";
+import logger from "../utils/logger.js";
 import Pdf from "../models/Pdf.js";
 import ChatMessage from "../models/ChatMessage.js";
 import { validateObjectIdParam } from "../middleware/validateObjectId.js";

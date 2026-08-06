@@ -10,85 +10,138 @@
 
 import { uploadPdfQueue, embedChunksQueue, synthesisQueue } from "./queues.js";
 import Pdf from "../models/Pdf.js";
-import { logger } from "./logger.js";
+import logger from "../utils/logger.js";
 
 /**
- * On uploadPdf job completion: update PDF pageCount
+ * Attach all BullMQ queue event listeners.
  */
 export function attachJobListeners() {
+  /**
+   * PDF upload completed
+   */
   uploadPdfQueue.on("completed", async (job) => {
     try {
       const { pdfId, pageCount } = job.returnvalue || {};
+
       if (pdfId) {
         await Pdf.findByIdAndUpdate(pdfId, {
           pageCount,
           processingStatus: "parsing_complete",
         });
-        logger.info({ jobId: job.id, pdfId, pageCount }, "PDF parsing complete; updating status");
+
+        logger.info(
+          { jobId: job.id, pdfId, pageCount },
+          "PDF parsing complete; updating status"
+        );
       }
     } catch (err) {
-      logger.error({ jobId: job.id, err }, "Failed to update PDF status after upload completion");
+      logger.error(
+        { jobId: job.id, err },
+        "Failed to update PDF status after upload completion"
+      );
     }
   });
 
+  /**
+   * PDF upload failed
+   */
   uploadPdfQueue.on("failed", async (job) => {
     try {
       const { pdfId } = job.data || {};
+
       if (pdfId) {
         await Pdf.findByIdAndUpdate(pdfId, {
           processingStatus: "failed",
           processingError: job.failedReason,
         });
-        logger.warn({ jobId: job.id, pdfId, reason: job.failedReason }, "PDF parsing failed");
+
+        logger.warn(
+          { jobId: job.id, pdfId, reason: job.failedReason },
+          "PDF parsing failed"
+        );
       }
     } catch (err) {
-      logger.error({ jobId: job.id, err }, "Failed to update PDF status after upload failure");
+      logger.error(
+        { jobId: job.id, err },
+        "Failed to update PDF status after upload failure"
+      );
     }
   });
 
   /**
-   * On embedChunks job completion: mark PDF as ready for chat
+   * Embedding completed
    */
   embedChunksQueue.on("completed", async (job) => {
     try {
       const { pdfId, chunksCreated } = job.returnvalue || {};
+
       if (pdfId) {
         await Pdf.findByIdAndUpdate(pdfId, {
           chunkCount: chunksCreated,
           processingStatus: "ready",
         });
-        logger.info({ jobId: job.id, pdfId, chunksCreated }, "Embeddings complete; PDF ready");
+
+        logger.info(
+          { jobId: job.id, pdfId, chunksCreated },
+          "Embeddings complete; PDF ready"
+        );
       }
     } catch (err) {
-      logger.error({ jobId: job.id, err }, "Failed to update PDF status after embedding completion");
+      logger.error(
+        { jobId: job.id, err },
+        "Failed to update PDF status after embedding completion"
+      );
     }
   });
 
+  /**
+   * Embedding failed
+   */
   embedChunksQueue.on("failed", async (job) => {
     try {
       const { pdfId } = job.data || {};
+
       if (pdfId) {
         await Pdf.findByIdAndUpdate(pdfId, {
           processingStatus: "failed",
           processingError: job.failedReason,
         });
-        logger.warn({ jobId: job.id, pdfId, reason: job.failedReason }, "Embedding job failed");
+
+        logger.warn(
+          { jobId: job.id, pdfId, reason: job.failedReason },
+          "Embedding job failed"
+        );
       }
     } catch (err) {
-      logger.error({ jobId: job.id, err }, "Failed to update PDF status after embedding failure");
+      logger.error(
+        { jobId: job.id, err },
+        "Failed to update PDF status after embedding failure"
+      );
     }
   });
 
   /**
-   * Synthesis jobs: store results (summaries, flashcards) in separate collections
-   * For now, just log completion. Later, create Summary/Flashcard documents.
+   * AI synthesis completed
    */
   synthesisQueue.on("completed", async (job) => {
-    logger.info({ jobId: job.id, type: job.data.type }, "Synthesis job completed");
+    logger.info(
+      { jobId: job.id, type: job.data?.type },
+      "Synthesis job completed"
+    );
   });
 
+  /**
+   * AI synthesis failed
+   */
   synthesisQueue.on("failed", async (job) => {
-    logger.warn({ jobId: job.id, type: job.data.type, reason: job.failedReason }, "Synthesis job failed");
+    logger.warn(
+      {
+        jobId: job.id,
+        type: job.data?.type,
+        reason: job.failedReason,
+      },
+      "Synthesis job failed"
+    );
   });
 
   logger.info("Job event listeners attached");

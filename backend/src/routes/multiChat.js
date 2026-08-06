@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { aiLimiter } from "../middleware/rateLimit.js";
 import { validate } from "../middleware/validate.js";
 import { multiChatMessageSchema } from "../validation/schemas.js";
+import Pdf from "../models/Pdf.js";
 import Chunk from "../models/Chunk.js";
 import MultiChatMessage from "../models/MultiChatMessage.js";
 import logger from "../utils/logger.js";
@@ -19,12 +20,21 @@ const ALL_SCOPE = "All subjects";
 // Same SSE streaming pattern as chat.js — see the comment there for the
 // wire format and why this uses fetch+ReadableStream on the frontend
 // instead of the native EventSource API.
+//
+// BullMQ: Only searches chunks from PDFs with processingStatus === 'ready'
 router.post("/", validate(multiChatMessageSchema), async (req, res) => {
   const { message, scope } = req.body;
   const effectiveScope = scope || ALL_SCOPE;
 
   try {
-    const filter = { owner: req.user.id };
+    // Find PDFs that are ready (BullMQ processing complete)
+    const readyPdfIds = await Pdf.find(
+      { owner: req.user.id, processingStatus: "ready" },
+      "_id"
+    ).lean();
+    const readyIds = readyPdfIds.map((p) => p._id);
+
+    const filter = { owner: req.user.id, pdfId: { $in: readyIds } };
     if (effectiveScope !== ALL_SCOPE) filter.subject = effectiveScope;
 
     // Querying the Chunk collection directly (rather than loading every
@@ -56,7 +66,7 @@ router.post("/", validate(multiChatMessageSchema), async (req, res) => {
           : `You haven't uploaded any notes under "${effectiveScope}" yet.`;
       sendToken(fullAnswer);
     } else {
-      const chunks = await Chunk.find(filter).select("text page filename subject embedding").lean();
+      const chunks = await Chunk.find(filter).select("text page subject embedding").lean();
       const queryEmbedding = await embedText(message);
       // Wider net than single-PDF chat (6 vs 4) since relevant material may be
       // spread thinner across more documents.

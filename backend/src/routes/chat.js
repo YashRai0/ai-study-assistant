@@ -40,11 +40,22 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
   const { pdfId } = req.params;
   const { message, mode } = req.body;
 
-  const doc = await Pdf.findOne({ _id: pdfId, owner: req.user.id }).select("_id");
+  const doc = await Pdf.findOne({ _id: pdfId, owner: req.user.id }).select(
+    "_id processingStatus processingError"
+  );
   if (!doc) return res.status(404).json({ error: "PDF not found." });
 
+  // BullMQ: PDF must be fully processed before chat is allowed
+  if (doc.processingStatus !== "ready") {
+    return res.status(409).json({
+      error: `PDF is still processing (${doc.processingStatus}). Please wait a moment and try again.`,
+      processingStatus: doc.processingStatus,
+      processingError: doc.processingError,
+    });
+  }
+
   try {
-    const chunks = await Chunk.find({ pdf: pdfId, owner: req.user.id }).select("text page embedding").lean();
+    const chunks = await Chunk.find({ pdfId, owner: req.user.id }).select("text page embedding").lean();
     const queryEmbedding = await embedText(message);
     const topChunks = retrieveTopK(chunks, queryEmbedding, 4);
 

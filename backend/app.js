@@ -26,6 +26,7 @@ import voiceRouter from "./src/routes/voice.js";
 import analyticsRouter from "./src/routes/analytics.js";
 import studyPlanRouter from "./src/routes/studyPlan.js";
 import groupsRouter from "./src/routes/groups.js";
+import adminRouter from "./src/routes/admin.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -71,6 +72,7 @@ v1.use("/voice", voiceRouter);
 v1.use("/analytics", analyticsRouter);
 v1.use("/study-plan", studyPlanRouter);
 v1.use("/groups", groupsRouter);
+v1.use("/admin", adminRouter);
 app.use("/api/v1", v1);
 
 // Central error handler

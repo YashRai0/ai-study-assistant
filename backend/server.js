@@ -11,14 +11,21 @@ import "./src/utils/validateEnv.js";
 import app from "./app.js";
 import { connectDb } from "./src/db/mongoose.js";
 import logger from "./src/utils/logger.js";
+import { getRedis, closeRedis } from "./src/services/redis.js";
+import { attachJobListeners } from "./src/services/jobListeners.js";
 
 const PORT = process.env.PORT || 5000;
 let server;
 
 connectDb()
   .then(() => {
+    // Initialize Redis connection and job event listeners
+    getRedis(); // Lazy-init singleton
+    attachJobListeners(); // Listen for queue events (job completion, failure)
+
     server = app.listen(PORT, () => {
       logger.info(`AI Study Assistant backend running on http://localhost:${PORT}`);
+      logger.info("BullMQ queues initialized (awaiting worker processes)");
     });
   })
   .catch((err) => {
@@ -59,13 +66,15 @@ const shutdown = (signal) => {
   forceExitTimer.unref();
 
   if (server) {
-    server.close(() => {
+    server.close(async () => {
       clearTimeout(forceExitTimer);
+      await closeRedis();
       logger.info("HTTP server closed. Exiting process.");
       process.exit(0);
     });
   } else {
     clearTimeout(forceExitTimer);
+    await closeRedis();
     process.exit(0);
   }
 };

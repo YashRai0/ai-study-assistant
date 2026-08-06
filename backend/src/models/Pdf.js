@@ -14,7 +14,21 @@ const pdfSchema = new mongoose.Schema({
   contentHash: { type: String, required: true }, // SHA-256 of the raw file bytes, for duplicate detection
   gridFsFileId: { type: mongoose.Schema.Types.ObjectId, required: true }, // original PDF bytes, stored via GridFS
   fullText: { type: String, required: true },
+  pageCount: { type: Number, default: null }, // Set by uploadPdf worker
   chunkCount: { type: Number, default: 0 }, // avoids a Chunk count query just to show this on the Dashboard
+  
+  // BullMQ async processing (Phase 1)
+  processingStatus: {
+    type: String,
+    enum: ["pending", "parsing_complete", "ready", "failed"],
+    default: "pending",
+    index: true,
+  },
+  uploadJobId: { type: String, default: null }, // BullMQ job ID for PDF parsing
+  embedJobId: { type: String, default: null }, // BullMQ job ID for embedding
+  synthesisJobId: { type: String, default: null }, // BullMQ job ID for summary/flashcards (optional)
+  processingError: { type: String, default: null }, // Error message if job failed
+  
   uploadedAt: { type: Date, default: Date.now },
 });
 

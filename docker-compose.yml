@@ -1,50 +1,127 @@
-# Local development stack: backend + frontend + a local MongoDB (instead of
-# Atlas) so the whole app runs with one command, no cloud accounts needed
-# just to try it out. Production deployment still uses MongoDB Atlas per
-# DEPLOYMENT.md — this compose file is for local dev/demo, not production.
+# Local development stack: backend + frontend + Redis + worker + MongoDB
+# Phase 1: BullMQ async task queue integration
 #
-# NOT VERIFIED BY AN ACTUAL RUN — no Docker daemon in the sandbox this was
-# built in. Run `docker compose up --build` locally and check it before
-# relying on it.
+# This compose file sets up:
+# - Redis: Message broker for BullMQ job queues
+# - MongoDB: Database for PDFs, chunks, users
+# - Backend: HTTP API server (port 5000)
+# - Worker: Background job processor (no exposed port)
+# - Frontend: React UI (port 5173)
 #
 # Usage:
-#   1. Copy .env.example (repo root) to .env and fill in GROQ_API_KEY, JWT_SECRET
+#   1. Copy .env.example to .env and fill in secrets
 #   2. docker compose up --build
-#   3. Frontend: http://localhost:5173 — Backend: http://localhost:5000/api/v1/health
+#   3. Frontend: http://localhost:5173
+#   4. Backend health: http://localhost:5000/api/v1/health
+#   5. Watch worker logs: docker compose logs worker -f
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: ai-study-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-network
+
   mongo:
     image: mongo:7
+    container_name: ai-study-mongo
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    networks:
+      - ai-network
 
   backend:
     build:
       context: ./backend
+    container_name: ai-study-backend
     ports:
       - "5000:5000"
     environment:
+      # Database
       MONGODB_URI: mongodb://mongo:27017/ai_study_assistant
+      
+      # Redis (BullMQ)
+      REDIS_URL: redis://redis:6379
+      
+      # API Keys & Secrets
       GROQ_API_KEY: ${GROQ_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      
+      # Server config
       CORS_ORIGIN: http://localhost:5173
       PORT: 5000
-      SIMILARITY_THRESHOLD: ${SIMILARITY_THRESHOLD:-0.3}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      
+      # Optional tuning
+      SIMILARITY_THRESHOLD: ${SIMILARITY_THRESHOLD:-0.3}
+    
     depends_on:
-      - mongo
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    
+    networks:
+      - ai-network
+
+  worker:
+    build:
+      context: ./backend
+    container_name: ai-study-worker
+    environment:
+      # Database
+      MONGODB_URI: mongodb://mongo:27017/ai_study_assistant
+      
+      # Redis (BullMQ)
+      REDIS_URL: redis://redis:6379
+      
+      # API Keys
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    
+    # Run worker process (not HTTP server)
+    command: npm run worker
+    
+    # No ports exposed (internal only)
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    
+    networks:
+      - ai-network
 
   frontend:
     build:
       context: ./frontend
       args:
         VITE_API_URL: http://localhost:5000/api/v1
+    container_name: ai-study-frontend
     ports:
       - "5173:80"
     depends_on:
       - backend
+    networks:
+      - ai-network
 
 volumes:
   mongo_data:
+  redis_data:
+
+networks:
+  ai-network:
+    driver: bridge

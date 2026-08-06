@@ -23,10 +23,11 @@ import quizRouter from "./src/routes/quiz.js";
 import searchRouter from "./src/routes/search.js";
 import multiChatRouter from "./src/routes/multiChat.js";
 import voiceRouter from "./src/routes/voice.js";
+import adminRouter from "./src/routes/admin.js";
 import analyticsRouter from "./src/routes/analytics.js";
 import studyPlanRouter from "./src/routes/studyPlan.js";
 import groupsRouter from "./src/routes/groups.js";
-import adminRouter from "./src/routes/admin.js";
+
 
 const app = express();
 app.set("trust proxy", 1);

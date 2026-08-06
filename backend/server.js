@@ -33,23 +33,11 @@ connectDb()
     process.exit(1);
   });
 
-// Handle graceful shutdown on signals sent by hosting platforms (e.g., Railway/Docker).
-// server.close() alone is not enough here: it stops accepting new connections
-// but its callback only fires once every existing connection ends — and this
-// app has long-lived SSE streams (chat.js, multiChat.js, group chat) that can
-// stay open well past a normal shutdown window. Verified directly: with one
-// open stream and no fallback, the process hung 8+ seconds with no sign of
-// closing on its own, until the platform's own SIGKILL grace period would
-// eventually force it anyway — silently, with no log explaining why.
-// SHUTDOWN_TIMEOUT_MS below guarantees an exit either way, and logs which
-// path was taken.
+// Graceful shutdown
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 let shuttingDown = false;
 
-const shutdown = (signal) => {
-  // Some platforms send the signal more than once during a redeploy; without
-  // this guard, a second call would invoke server.close() on an
-  // already-closing server, which throws (ERR_SERVER_NOT_RUNNING).
+const shutdown = async (signal) => {
   if (shuttingDown) return;
   shuttingDown = true;
 
@@ -61,22 +49,39 @@ const shutdown = (signal) => {
     );
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
-  // Don't let this pending timer itself keep the process alive if the
-  // graceful path finishes first.
+
+  // Don't let the timer keep the process alive
   forceExitTimer.unref();
 
-  if (server) {
-    server.close(async () => {
-      clearTimeout(forceExitTimer);
-      await closeRedis();
-      logger.info("HTTP server closed. Exiting process.");
-      process.exit(0);
-    });
-  } else {
-    clearTimeout(forceExitTimer);
+  try {
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close((err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+
+      logger.info("HTTP server closed.");
+    }
+
     await closeRedis();
+    logger.info("Redis connection closed.");
+    logger.info("Graceful shutdown complete.");
+
+    clearTimeout(forceExitTimer);
     process.exit(0);
+  } catch (err) {
+    clearTimeout(forceExitTimer);
+    logger.error({ err }, "Error during graceful shutdown.");
+    process.exit(1);
   }
 };
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+process.on("SIGINT", () => {
+  shutdown("SIGINT");
+});
+
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM");
+});

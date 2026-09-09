@@ -14,6 +14,7 @@ import { test, describe, before, after, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { startTestDb, stopTestDb, clearTestDb, setTestEnv } from "./setup.js";
+import * as realLlm from "../../src/services/llm.js";
 
 const FAKE_EMBEDDING = new Array(384).fill(1); // matches the Chunk fixture below for a guaranteed strong match
 
@@ -27,14 +28,15 @@ describe("Chat integration", () => {
     setTestEnv();
 
     mock.module("../../src/services/embeddings.js", {
-      namedExports: {
+      exports: {
         embedText: async () => FAKE_EMBEDDING,
         embedChunks: async (chunks) => chunks.map(() => FAKE_EMBEDDING),
       },
     });
 
     mock.module("../../src/services/llm.js", {
-      namedExports: {
+      exports: {
+        ...realLlm,
         answerFromNotes: async () => "Mocked answer from notes.",
         streamAnswerFromNotes: async (question, chunks, onToken) => {
           const text = "Mocked streamed answer about deadlocks (Page 1).";
@@ -73,7 +75,7 @@ describe("Chat integration", () => {
     const registerRes = await request(app)
       .post("/api/v1/auth/register")
       .send({ email: "chatuser@example.com", password: "password123" });
-    token = registerRes.body.token;
+    token = registerRes.body.accessToken;
 
     // Inserting a Pdf + Chunk directly via the models, bypassing the upload
     // route — that route exercises the real (unmocked) PDF-parsing
@@ -94,6 +96,7 @@ describe("Chat integration", () => {
       gridFsFileId: user._id, // placeholder ObjectId — fine, these tests never hit the /file download route
       fullText: "Deadlock is a situation where two or more processes are waiting on each other indefinitely.",
       chunkCount: 1,
+      processingStatus: "ready", // chat route requires this; direct-insert bypasses the upload pipeline that normally sets it
     });
 
     await Chunk.create({

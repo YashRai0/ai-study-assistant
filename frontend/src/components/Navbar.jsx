@@ -4,12 +4,14 @@ import { useAuth } from "../api/AuthContext.jsx";
 
 const LOGGED_IN_LINKS = [
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/study", label: "Study" },
   { to: "/chat-all", label: "Chat all notes" },
   { to: "/search", label: "Search" },
   { to: "/analytics", label: "Analytics" },
   { to: "/study-plan", label: "Study Plan" },
   { to: "/groups", label: "Groups" },
   { to: "/review", label: "Review" },
+  { to: "/settings", label: "Settings" },
 ];
 
 export default function Navbar() {

@@ -36,11 +36,16 @@ describe("Upload integration", () => {
     const res = await request(app)
       .post("/api/v1/auth/register")
       .send({ email: "uploader@example.com", password: "password123" });
-    token = res.body.token;
+    token = res.body.accessToken;
   });
 
   test("rejects an upload with no auth token", async () => {
-    const res = await request(app).post("/api/v1/upload").attach("file", MINIMAL_PDF);
+    // No file attached: this test only checks the auth gate (requireAuth
+    // runs before multer), so sending a real multipart body here would let
+    // the server's 401 response close the connection while the client is
+    // still streaming file bytes — which Windows' TCP stack turns into an
+    // ECONNRESET instead of a clean 401 response.
+    const res = await request(app).post("/api/v1/upload");
     assert.equal(res.status, 401);
   });
 
@@ -64,7 +69,7 @@ describe("Upload integration", () => {
       .field("subject", "Testing")
       .attach("file", MINIMAL_PDF);
 
-    assert.equal(uploadRes.status, 201);
+    assert.equal(uploadRes.status, 202);
     assert.ok(uploadRes.body.pdfId);
     assert.equal(uploadRes.body.subject, "Testing");
 
@@ -79,7 +84,7 @@ describe("Upload integration", () => {
       .post("/api/v1/upload")
       .set("Authorization", `Bearer ${token}`)
       .attach("file", MINIMAL_PDF);
-    assert.equal(first.status, 201);
+    assert.equal(first.status, 202);
 
     const second = await request(app)
       .post("/api/v1/upload")
@@ -113,7 +118,7 @@ describe("Upload integration", () => {
     const otherUserRes = await request(app)
       .post("/api/v1/auth/register")
       .send({ email: "other@example.com", password: "password123" });
-    const otherToken = otherUserRes.body.token;
+    const otherToken = otherUserRes.body.accessToken;
 
     const listRes = await request(app).get("/api/v1/upload").set("Authorization", `Bearer ${otherToken}`);
     assert.equal(listRes.body.pdfs.length, 0);

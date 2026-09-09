@@ -8,7 +8,7 @@
 // Only variables actually read via process.env elsewhere in the backend are
 // checked here (see auth.js, middleware/auth.js, llm.js, voice.js,
 // db/mongoose.js) — this list should stay in sync with those call sites.
-const REQUIRED_ENV_VARS = ["JWT_SECRET", "GROQ_API_KEY", "MONGODB_URI"];
+const REQUIRED_ENV_VARS = ["JWT_SECRET", "REFRESH_TOKEN_SECRET", "GROQ_API_KEY", "MONGODB_URI"];
 
 function validateEnv() {
   const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);

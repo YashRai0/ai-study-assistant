@@ -2,6 +2,7 @@ import { Router } from "express";
 import { generateFlashcards } from "../services/llm.js";
 import { scheduleNextReview } from "../services/spacedRepetition.js";
 import { requireAuth } from "../middleware/auth.js";
+import { asQueryString } from "../utils/asQueryString.js";
 import { aiLimiter } from "../middleware/rateLimit.js";
 import { validate } from "../middleware/validate.js";
 import { flashcardsSchema, flashcardsResultSchema, reviewFlashcardSchema } from "../validation/schemas.js";
@@ -66,7 +67,8 @@ router.get("/:pdfId", async (req, res) => {
 // Cards due for review right now, optionally scoped to a subject — powers
 // the spaced-repetition review queue across all of a user's PDFs at once.
 router.get("/due/queue", async (req, res) => {
-  const { subject } = req.query;
+  const { subject: rawSubject } = req.query;
+  const subject = asQueryString(rawSubject);
   const filter = { owner: req.user.id, nextReviewDate: { $lte: new Date() } };
   if (subject && subject !== "All subjects") filter.subject = subject;
 

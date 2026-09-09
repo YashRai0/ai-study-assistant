@@ -19,8 +19,15 @@ const chunkSchema = new mongoose.Schema({
   page: { type: Number, required: true },
   text: { type: String, required: true },
   embedding: { type: [Number], required: true },
+  // SHA-256 of `text`, distinct from Pdf.contentHash (which hashes the raw
+  // uploaded file for duplicate-upload detection, not per-chunk text).
+  // Lets a retried embedding job recognize a chunk whose text is unchanged
+  // from a previous attempt and reuse its embedding instead of paying for
+  // the embedding model again — see workers/processEmbedChunks.js.
+  contentHash: { type: String, index: true },
 });
 
 chunkSchema.index({ owner: 1, subject: 1 });
+chunkSchema.index({ pdf: 1, contentHash: 1 });
 
 export default mongoose.model("Chunk", chunkSchema);

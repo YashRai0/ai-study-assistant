@@ -1,14 +1,9 @@
 import { Router } from "express";
 import { embedText } from "../services/embeddings.js";
-import { retrieveTopK, bestScore, SIMILARITY_THRESHOLD } from "../services/vectorStore.js";
-import { streamAnswerAcrossNotes } from "../services/llm.js";
+import { hybridRetrieve } from "../services/hybridRetrieval.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiLimiter } from "../middleware/rateLimit.js";
-import { validate } from "../middleware/validate.js";
-import { multiChatMessageSchema } from "../validation/schemas.js";
-import Pdf from "../models/Pdf.js";
 import Chunk from "../models/Chunk.js";
-import MultiChatMessage from "../models/MultiChatMessage.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -17,97 +12,60 @@ router.use(aiLimiter);
 
 const ALL_SCOPE = "All subjects";
 
-// Same SSE streaming pattern as chat.js — see the comment there for the
-// wire format and why this uses fetch+ReadableStream on the frontend
-// instead of the native EventSource API.
-//
-// BullMQ: Only searches chunks from PDFs with processingStatus === 'ready'
-router.post("/", validate(multiChatMessageSchema), async (req, res) => {
-  const { message, scope } = req.body;
-  const effectiveScope = scope || ALL_SCOPE;
-
+// Distinct subjects across the student's own chunks — used to populate the
+// subject filter pills on the Search page. Chunk (not Pdf) is the source of
+// truth here since subject is denormalized onto it (see Chunk.js's comment).
+router.get("/subjects", async (req, res) => {
   try {
-    // Find PDFs that are ready (BullMQ processing complete)
-    const readyPdfIds = await Pdf.find(
-      { owner: req.user.id, processingStatus: "ready" },
-      "_id"
-    ).lean();
-    const readyIds = readyPdfIds.map((p) => p._id);
-
-    const filter = { owner: req.user.id, pdfId: { $in: readyIds } };
-    if (effectiveScope !== ALL_SCOPE) filter.subject = effectiveScope;
-
-    // Querying the Chunk collection directly (rather than loading every
-    // matching Pdf document and its embedded chunks) means this only reads
-    // the chunk data it actually needs, filtered at the database level.
-    const chunkCount = await Chunk.countDocuments(filter);
-
-    // Headers are set only once we're past the checks that could still fail
-    // cleanly with a JSON error — same reasoning as chat.js, so an early
-    // DB failure returns a normal error response instead of a mid-stream one.
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.();
-
-    // Same reasoning as chat.js: without this, an abandoned request kept the
-    // Groq stream running server-side to completion for nothing.
-    const controller = new AbortController();
-    req.on("close", () => controller.abort());
-
-    const sendToken = (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`);
-
-    let fullAnswer;
-
-    if (chunkCount === 0) {
-      fullAnswer =
-        effectiveScope === ALL_SCOPE
-          ? "You haven't uploaded any notes yet — upload a PDF first."
-          : `You haven't uploaded any notes under "${effectiveScope}" yet.`;
-      sendToken(fullAnswer);
-    } else {
-      const chunks = await Chunk.find(filter).select("text page subject embedding").lean();
-      const queryEmbedding = await embedText(message);
-      // Wider net than single-PDF chat (6 vs 4) since relevant material may be
-      // spread thinner across more documents.
-      const topChunks = retrieveTopK(chunks, queryEmbedding, 6);
-
-      if (bestScore(topChunks) < SIMILARITY_THRESHOLD) {
-        fullAnswer = "I couldn't find this information in your uploaded notes.";
-        sendToken(fullAnswer);
-      } else {
-        fullAnswer = await streamAnswerAcrossNotes(message, topChunks, sendToken, controller.signal);
-      }
-    }
-
-    if (controller.signal.aborted) return;
-
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-    res.end();
-
-    await MultiChatMessage.create({ owner: req.user.id, scope: effectiveScope, role: "user", content: message });
-    await MultiChatMessage.create({ owner: req.user.id, scope: effectiveScope, role: "assistant", content: fullAnswer });
+    const subjects = await Chunk.distinct("subject", { owner: req.user.id });
+    res.json({ subjects: subjects.filter(Boolean).sort() });
   } catch (err) {
-    logger.error({ reqId: req.id, err }, "Multi-chat error");
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Couldn't generate an answer right now. Please try again." });
-    } else {
-      res.write(`data: ${JSON.stringify({ error: "Something went wrong while generating the answer." })}\n\n`);
-      res.end();
-    }
+    logger.error({ reqId: req.id, err }, "Failed to list subjects");
+    res.status(500).json({ error: "Failed to list subjects." });
   }
 });
 
-router.get("/history", async (req, res) => {
-  const scope = req.query.scope || ALL_SCOPE;
-  const history = await MultiChatMessage.find({ owner: req.user.id, scope }).sort({ ts: 1 }).limit(500);
-  res.json({ history });
-});
+// Semantic search across the student's notes: embeds the query, retrieves
+// the best-matching chunks via hybridRetrieve, and returns them as plain
+// JSON results (filename/subject/page/text/score) for the Search page to
+// list and link back into that PDF's chat view — distinct from multi-chat
+// (multiChat.js), which answers a question conversationally instead of
+// returning a ranked list of source passages.
+router.post("/", async (req, res) => {
+  const { query, subject } = req.body;
+  const effectiveScope = subject || ALL_SCOPE;
 
-router.delete("/history", async (req, res) => {
-  const scope = req.query.scope || ALL_SCOPE;
-  await MultiChatMessage.deleteMany({ owner: req.user.id, scope });
-  res.json({ ok: true });
+  if (!query || !query.trim()) {
+    return res.status(400).json({ error: "Search query is required." });
+  }
+
+  try {
+    const filter = { owner: req.user.id };
+    if (effectiveScope !== ALL_SCOPE) filter.subject = effectiveScope;
+
+    const chunks = await Chunk.find(filter).select("pdf text page subject filename embedding").lean();
+
+    if (chunks.length === 0) {
+      return res.json({ results: [] });
+    }
+
+    const queryEmbedding = await embedText(query);
+    const topChunks = hybridRetrieve(chunks, query, queryEmbedding, 20);
+
+    const results = topChunks.map((c) => ({
+      pdfId: c.pdf,
+      filename: c.filename,
+      subject: c.subject,
+      page: c.page,
+      text: c.text,
+      score: c.score,
+    }));
+
+    res.json({ results });
+  } catch (err) {
+    logger.error({ reqId: req.id, err }, "Search error");
+    res.status(500).json({ error: "Couldn't run that search right now. Please try again." });
+  }
 });
 
 export default router;

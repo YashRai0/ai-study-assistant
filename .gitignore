@@ -21,3 +21,6 @@ npm-debug.log*
 # Local temp files from OCR/upload processing (backend uses os.tmpdir(), not
 # a project-local dir, but this guards against any local override)
 *.tmp
+
+.vercel
+.env*

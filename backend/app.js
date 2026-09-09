@@ -15,7 +15,8 @@ import { generalLimiter } from "./src/middleware/rateLimit.js";
 import { requestId } from "./src/middleware/requestId.js";
 import logger from "./src/utils/logger.js";
 import authRouter from "./src/routes/auth.js";
-import uploadRouter from "./src/routes/upload.js";
+import uploadRouter from "./src/routes/upload-new.js";
+import learningRouter from "./src/routes/learning.js";
 import chatRouter from "./src/routes/chat.js";
 import summaryRouter from "./src/routes/summary.js";
 import flashcardsRouter from "./src/routes/flashcards.js";
@@ -27,6 +28,10 @@ import adminRouter from "./src/routes/admin.js";
 import analyticsRouter from "./src/routes/analytics.js";
 import studyPlanRouter from "./src/routes/studyPlan.js";
 import groupsRouter from "./src/routes/groups.js";
+import examRouter from "./src/routes/exam.js";
+import featuresRouter from "./src/routes/features.js";
+import healthRouter from "./src/routes/health.js";
+import { performanceMiddleware } from "./src/services/performanceService.js";
 
 
 const app = express();
@@ -34,6 +39,12 @@ app.set("trust proxy", 1);
 
 // Security headers
 app.use(helmet({ contentSecurityPolicy: false }));
+app.use(performanceMiddleware());
+
+// Health check — mounted at /api (not /api/v1) so it's reachable at
+// /api/health, matching what docker-compose's healthcheck and the
+// Dockerfile's own healthcheck both expect.
+app.use("/api", healthRouter);
 
 // Allowed origins for CORS (supports comma-separated origins from ENV or localhost fallback)
 const rawOrigins = process.env.CLIENT_URL || process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -73,7 +84,10 @@ v1.use("/voice", voiceRouter);
 v1.use("/analytics", analyticsRouter);
 v1.use("/study-plan", studyPlanRouter);
 v1.use("/groups", groupsRouter);
+v1.use("/learning", learningRouter);
+v1.use("/exam", examRouter);
 v1.use("/admin", adminRouter);
+v1.use("/", featuresRouter);
 app.use("/api/v1", v1);
 
 // Central error handler

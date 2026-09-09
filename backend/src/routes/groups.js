@@ -1,7 +1,8 @@
 import { Router } from "express";
 import crypto from "crypto";
 import { embedText } from "../services/embeddings.js";
-import { retrieveTopK, bestScore, SIMILARITY_THRESHOLD } from "../services/vectorStore.js";
+import { bestScore, SIMILARITY_THRESHOLD } from "../services/vectorStore.js";
+import { hybridRetrieve } from "../services/hybridRetrieval.js";
 import { streamAnswerAcrossNotes } from "../services/llm.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiLimiter } from "../middleware/rateLimit.js";
@@ -208,7 +209,7 @@ router.post("/:groupId/chat", requireMembership, aiLimiter, validate(groupChatMe
 
     const chunks = await Chunk.find({ pdf: { $in: pdfIds } }).select("text page filename subject embedding").lean();
     const queryEmbedding = await embedText(message);
-    const topChunks = retrieveTopK(chunks, queryEmbedding, 6);
+    const topChunks = hybridRetrieve(chunks, message, queryEmbedding, 6);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

@@ -18,10 +18,19 @@ import StudyPlan from "./pages/StudyPlan.jsx";
 import Groups from "./pages/Groups.jsx";
 import GroupDetail from "./pages/GroupDetail.jsx";
 import Review from "./pages/Review.jsx";
+import AdaptiveStudy from "./pages/AdaptiveStudy.jsx";
+import DiagnosticTest from "./pages/DiagnosticTest.jsx";
+import CourseHome from "./pages/CourseHome.jsx";
+import StudySession from "./pages/StudySession.jsx";
+import ExamMode from "./pages/ExamMode.jsx";
+import Onboarding from "./pages/Onboarding.jsx";
+import Settings from "./pages/Settings.jsx";
+import { NotFoundPage } from "./pages/ErrorPage.jsx";
+import MobileNav from "./components/MobileNav.jsx";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="min-h-screen bg-paper pb-16 md:pb-0">
       <Navbar />
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -41,7 +50,16 @@ export default function App() {
         <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
         <Route path="/groups/:groupId" element={<ProtectedRoute><GroupDetail /></ProtectedRoute>} />
         <Route path="/review" element={<ProtectedRoute><Review /></ProtectedRoute>} />
+        <Route path="/adaptive-study" element={<ProtectedRoute><AdaptiveStudy /></ProtectedRoute>} />
+        <Route path="/diagnostic" element={<ProtectedRoute><DiagnosticTest /></ProtectedRoute>} />
+        <Route path="/study" element={<ProtectedRoute><CourseHome /></ProtectedRoute>} />
+        <Route path="/study-session" element={<ProtectedRoute><StudySession /></ProtectedRoute>} />
+        <Route path="/exam" element={<ProtectedRoute><ExamMode /></ProtectedRoute>} />
+        <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <MobileNav />
     </div>
   );
 }

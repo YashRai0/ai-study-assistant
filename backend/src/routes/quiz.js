@@ -10,6 +10,7 @@ import Pdf from "../models/Pdf.js";
 import QuizAttempt from "../models/QuizAttempt.js";
 import logger from "../utils/logger.js";
 import { validateObjectIdParam } from "../middleware/validateObjectId.js";
+import { trackEvent } from "../services/analyticsService.js";
 
 const attemptSchema = z.object({
   score: z.number().int().min(0),
@@ -61,6 +62,7 @@ router.post("/:pdfId/attempts", validate(attemptSchema), async (req, res) => {
       score,
       total,
     });
+    await trackEvent(req.user.id, "quiz_completed", { pdfId: doc._id, score, total });
     res.status(201).json({ ok: true });
   } catch (err) {
     logger.error({ reqId: req.id, err }, "Failed to record quiz attempt");

@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export const TOKEN_KEY = "ai_study_assistant_token";
+export const REFRESH_TOKEN_KEY = "ai_study_assistant_refresh_token";
 
 // In local dev, Vite proxies "/api" to the backend (see vite.config.js).
 // In production, set VITE_API_URL to your deployed backend's URL, e.g.
@@ -16,31 +17,78 @@ client.interceptors.request.use((config) => {
 });
 
 // If the backend ever rejects a request as unauthorized (expired/invalid
-// token, or the token was cleared some other way), stop the app in its
-// tracks instead of letting protected pages hang on a request that will
-// never succeed. This complements the one-time check in AuthContext's
-// useEffect (which only runs on initial mount) by catching a 401 that
-// happens *during* an active session — e.g. the token expires while the
-// user is mid-way through using the app.
-//
-// This lives here (not in AuthContext) because any component using
-// `client` benefits automatically, without each one needing its own
-// try/catch for the 401 case.
+// access token), try once to silently refresh it using the stored refresh
+// token before giving up. Only refresh tokens are long-lived (30 days);
+// access tokens expire in 15 minutes, so without this every user would get
+// bounced to /login every 15 minutes with no warning.
+let isRefreshing = false;
+let refreshWaiters = [];
+
+function onRefreshed(newToken) {
+  refreshWaiters.forEach((cb) => cb(newToken));
+  refreshWaiters = [];
+}
+
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status !== 401 || originalRequest._retry) {
+      // Not a 401, or we already tried refreshing once for this request —
+      // give up the same way as before.
+      if (error.response?.status === 401) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
+      return Promise.reject(error);
+    }
+
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
       localStorage.removeItem(TOKEN_KEY);
-      // Full reload (not a react-router navigate) so AuthProvider's mount
-      // logic re-runs cleanly from a known-good state, and any in-flight
-      // component state tied to the now-invalid session is discarded
-      // rather than patched around. Guard against a redirect loop if the
-      // 401 happens to originate from the login page itself.
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    originalRequest._retry = true;
+
+    if (isRefreshing) {
+      // Another request already triggered a refresh; wait for it instead
+      // of firing a second /auth/refresh call at the same time.
+      return new Promise((resolve, reject) => {
+        refreshWaiters.push((newToken) => {
+          if (!newToken) return reject(error);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          resolve(client(originalRequest));
+        });
+      });
+    }
+
+    isRefreshing = true;
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+      localStorage.setItem(TOKEN_KEY, data.accessToken);
+      if (data.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+      isRefreshing = false;
+      onRefreshed(data.accessToken);
+      originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+      return client(originalRequest);
+    } catch (refreshErr) {
+      isRefreshing = false;
+      onRefreshed(null);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      return Promise.reject(refreshErr);
+    }
   }
 );
 

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import client, { TOKEN_KEY } from "./client.js";
+import client, { TOKEN_KEY, REFRESH_TOKEN_KEY } from "./client.js";
 
 const AuthContext = createContext(null);
 
@@ -16,24 +16,30 @@ export function AuthProvider({ children }) {
     client
       .get("/auth/me")
       .then(({ data }) => setEmail(data.email))
-      .catch(() => localStorage.removeItem(TOKEN_KEY))
+      .catch(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+      })
       .finally(() => setReady(true));
   }, []);
 
   async function login(loginEmail, password) {
     const { data } = await client.post("/auth/login", { email: loginEmail, password });
-    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(TOKEN_KEY, data.accessToken);
+    if (data.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
     setEmail(data.email);
   }
 
   async function register(regEmail, password) {
     const { data } = await client.post("/auth/register", { email: regEmail, password });
-    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(TOKEN_KEY, data.accessToken ?? data.token);
+    if (data.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
     setEmail(data.email);
   }
 
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     setEmail(null);
   }
 

@@ -14,7 +14,7 @@
 // and keep in sync), not a small code change, and out of scope for this
 // project's current size.
 
-function cosineSimilarity(a, b) {
+export function cosineSimilarity(a, b) {
   let dot = 0;
   let normA = 0;
   let normB = 0;

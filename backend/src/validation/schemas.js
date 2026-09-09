@@ -10,6 +10,27 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required."),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email address."),
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email address."),
+  token: z.string().trim().min(32).max(256),
+  newPassword: z.string().min(8, "Password must be at least 8 characters."),
+});
+
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string().trim().min(1, "Refresh token is required."),
+});
+
+export const updateProfileSchema = z.object({
+  name: z.string().trim().max(100).optional(),
+  notificationsEnabled: z.boolean().optional(),
+  emailFrequency: z.enum(["daily", "weekly", "never"]).optional(),
+  dataSharing: z.boolean().optional(),
+});
+
 export const chatMessageSchema = z.object({
   message: z.string().trim().min(1, "Message is required.").max(2000, "Message is too long."),
   mode: z.enum(["chat", "explain"]).optional(),

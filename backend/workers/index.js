@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 /**
  * Worker Startup: BullMQ Processors
  *
@@ -10,69 +12,40 @@
  */
 
 import { Worker } from "bullmq";
+import { connectDb } from "../src/db/mongoose.js";
 import { getRedis, closeRedis } from "../src/services/redis.js";
-import { logger } from "../src/services/logger.js";
+import logger from "../src/utils/logger.js";
 import { retryStrategies, isRetryableError, logRetry } from "../src/services/jobRetry.js";
 
 // Import processors
 import { processPdfUpload } from "./processPdfUpload.js";
+import { processDocxUpload } from "./processDocxUpload.js";
+import { processPptxUpload } from "./processPptxUpload.js";
+import { processYoutubeIngest } from "./processYoutubeIngest.js";
+import { processAudioUpload } from "./processAudioUpload.js";
 import { processEmbedChunks } from "./processEmbedChunks.js";
 import { processOcr } from "./processOcr.js";
 import { processSynthesis } from "./processSynthesis.js";
+import { processLearning } from "./processLearning.js";
+import { processLearningEvent } from "./processLearningEvent.js";
 
 // Create workers (one per queue)
+await connectDb();
 const workers = [
-  new Worker("uploadPdf", processPdfUpload, {
-    connection: getRedis(),
-    concurrency: 2,
-    settings: {
-      attempts: retryStrategies.uploadPdf.maxAttempts,
-      backoffStrategy: retryStrategies.uploadPdf.backoffStrategy,
-      backoffStrategies: {
-        exponential: (attemptsMade) => Math.pow(2, attemptsMade) * 1000,
-        linear: (attemptsMade) => (attemptsMade + 1) * 2000,
-      },
-    },
-  }),
+  new Worker("uploadPdf", processPdfUpload, { connection: getRedis(), concurrency: 2 }),
+  new Worker("uploadDocx", processDocxUpload, { connection: getRedis(), concurrency: 2 }),
+  new Worker("uploadPptx", processPptxUpload, { connection: getRedis(), concurrency: 2 }),
+  new Worker("ingestYoutube", processYoutubeIngest, { connection: getRedis(), concurrency: 2 }),
+  new Worker("uploadAudio", processAudioUpload, { connection: getRedis(), concurrency: 2 }),
 
-  new Worker("embedChunks", processEmbedChunks, {
-    connection: getRedis(),
-    concurrency: 1,
-    settings: {
-      attempts: retryStrategies.embedChunks.maxAttempts,
-      backoffStrategy: retryStrategies.embedChunks.backoffStrategy,
-      backoffStrategies: {
-        exponential: (attemptsMade) => Math.pow(2, attemptsMade) * 1000,
-        linear: (attemptsMade) => (attemptsMade + 1) * 2000,
-      },
-    },
-  }),
+  new Worker("embedChunks", processEmbedChunks, { connection: getRedis(), concurrency: 1 }),
 
-  new Worker("ocr", processOcr, {
-    connection: getRedis(),
-    concurrency: 1,
-    settings: {
-      attempts: retryStrategies.ocr.maxAttempts,
-      backoffStrategy: retryStrategies.ocr.backoffStrategy,
-      backoffStrategies: {
-        exponential: (attemptsMade) => Math.pow(2, attemptsMade) * 1000,
-        linear: (attemptsMade) => (attemptsMade + 1) * 2000,
-      },
-    },
-  }),
+  new Worker("ocr", processOcr, { connection: getRedis(), concurrency: 1 }),
 
-  new Worker("synthesis", processSynthesis, {
-    connection: getRedis(),
-    concurrency: 2,
-    settings: {
-      attempts: retryStrategies.synthesis.maxAttempts,
-      backoffStrategy: retryStrategies.synthesis.backoffStrategy,
-      backoffStrategies: {
-        exponential: (attemptsMade) => Math.pow(2, attemptsMade) * 1000,
-        linear: (attemptsMade) => (attemptsMade + 1) * 2000,
-      },
-    },
-  }),
+  new Worker("synthesis", processSynthesis, { connection: getRedis(), concurrency: 2 }),
+
+  new Worker("learning", processLearning, { connection: getRedis(), concurrency: 1 }),
+  new Worker("learningEvent", processLearningEvent, { connection: getRedis(), concurrency: 4 }),
 ];
 
 // Log job lifecycle events
@@ -82,7 +55,16 @@ workers.forEach((worker) => {
   });
 
   worker.on("failed", (job, err) => {
-    const strategy = retryStrategies[worker.name];
+    // Falls back to a conservative default (single attempt, already
+    // exhausted) instead of throwing if a queue is ever added without a
+    // matching entry in retryStrategies — this handler runs inside a
+    // synchronous BullMQ event listener, so an uncaught exception here
+    // would crash the entire worker process (all six queues), not just
+    // whichever job failed. This is exactly what happened before
+    // `learning`/`learningEvent` had entries here: every failure in
+    // either queue took down PDF upload, embedding, OCR, and synthesis
+    // processing along with it.
+    const strategy = retryStrategies[worker.name] || { maxAttempts: job.opts?.attempts ?? 1 };
     const retryable = isRetryableError(err);
     const willRetry = job.attemptsMade < strategy.maxAttempts && retryable;
 

@@ -50,6 +50,46 @@ export const retryStrategies = {
     removeOnFail: false, // Keep for debugging
   },
 
+  uploadDocx: {
+    maxAttempts: 3,
+    backoffStrategy: "exponential",
+    timeout: 60 * 1000,
+    removeOnComplete: { age: 3600 },
+    removeOnFail: false,
+  },
+
+  uploadPptx: {
+    maxAttempts: 3,
+    backoffStrategy: "exponential",
+    timeout: 60 * 1000,
+    removeOnComplete: { age: 3600 },
+    removeOnFail: false,
+  },
+
+  ingestYoutube: {
+    // Network-dependent (unlike the file-parsing queues above, where a
+    // failure is almost always deterministic — a corrupted file fails
+    // the same way every retry). A transcript fetch can fail transiently
+    // (rate limiting, a momentary network blip), so more attempts and a
+    // longer timeout are worth it here.
+    maxAttempts: 4,
+    backoffStrategy: "exponential",
+    timeout: 90 * 1000,
+    removeOnComplete: { age: 3600 },
+    removeOnFail: false,
+  },
+
+  uploadAudio: {
+    // Whisper transcription time scales with recording length — longer
+    // timeout than ingestYoutube, plus retries for the same
+    // transient-failure reasons (network-dependent, not deterministic).
+    maxAttempts: 4,
+    backoffStrategy: "exponential",
+    timeout: 5 * 60 * 1000,
+    removeOnComplete: { age: 3600 },
+    removeOnFail: false,
+  },
+
   embedChunks: {
     maxAttempts: 2, // Embeddings are deterministic; retry only once for transient errors
     backoffStrategy: "exponential",
@@ -70,6 +110,29 @@ export const retryStrategies = {
     maxAttempts: 3, // LLM calls may have transient rate limits
     backoffStrategy: "exponential",
     timeout: 2 * 60 * 1000, // 2min per synthesis
+    removeOnComplete: { age: 3600 },
+    removeOnFail: false,
+  },
+
+  learning: {
+    // buildCourseLearningModel() does LLM-based concept/prerequisite
+    // extraction — same failure profile as synthesis (transient rate
+    // limits), so the same retry shape.
+    maxAttempts: 3,
+    backoffStrategy: "exponential",
+    timeout: 3 * 60 * 1000, // 3min — extracting concepts across a whole course
+    removeOnComplete: { age: 3600 },
+    removeOnFail: false,
+  },
+
+  learningEvent: {
+    // persistLearningEvent() is an idempotent DB-only ledger write (safe
+    // to retry) that mostly only fails on transient DB connectivity, so
+    // it gets a quick, short-timeout retry rather than synthesis's LLM-
+    // oriented backoff.
+    maxAttempts: 3,
+    backoffStrategy: "exponential",
+    timeout: 15 * 1000,
     removeOnComplete: { age: 3600 },
     removeOnFail: false,
   },

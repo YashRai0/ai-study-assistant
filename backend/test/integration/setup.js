@@ -3,6 +3,15 @@
 // it, so these tests exercise actual database behavior (schema validation,
 // unique indexes, transactions) without touching a real database.
 //
+// dotenv/config must be imported before anything else in this file: the
+// imports below eventually pull in src/services/queues.js, which reads
+// process.env.REDIS_URL at module-load time. Without dotenv loaded first,
+// that read sees undefined, ioredis falls back to redis://localhost:6379,
+// and — since nothing is listening there — every later attempt to close
+// that connection hangs forever waiting for a connection that never
+// completes, instead of failing fast.
+import "dotenv/config";
+//
 // IMPORTANT CAVEAT: mongodb-memory-server downloads a real mongod binary on
 // first run if one isn't already cached locally, which requires network
 // access. These tests were written to the standard, well-established
@@ -13,6 +22,8 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { connectDb } from "../../src/db/mongoose.js";
+import { ALL_QUEUES } from "../../src/services/queues.js";
+import { closeRedis } from "../../src/services/redis.js";
 
 let mongod;
 
@@ -33,6 +44,18 @@ export async function startTestDb() {
 export async function stopTestDb() {
   await mongoose.disconnect();
   if (mongod) await mongod.stop();
+  await stopTestQueues();
+}
+
+// Importing app.js (or any worker) pulls in src/services/queues.js, which
+// opens a BullMQ Queue — and therefore a live ioredis connection — for
+// every queue at module-load time. None of that closes itself, so without
+// this the test process never goes idle: node --test eventually force-kills
+// the file after its timeout, which is what "Promise resolution is still
+// pending but the event loop has already resolved" actually means here.
+export async function stopTestQueues() {
+  await Promise.all(ALL_QUEUES.map((queue) => queue.close()));
+  await closeRedis();
 }
 
 export async function clearTestDb() {

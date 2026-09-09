@@ -1,5 +1,5 @@
 import Tesseract from "tesseract.js";
-import { logger } from "../src/services/logger.js";
+import logger from "../src/utils/logger.js";
 
 /**
  * Worker: Extract text via OCR from scanned PDF pages

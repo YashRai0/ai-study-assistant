@@ -29,7 +29,8 @@ describe("Auth integration", () => {
       .post("/api/v1/auth/register")
       .send({ email: "student@example.com", password: "password123" });
     assert.equal(res.status, 201);
-    assert.ok(res.body.token);
+    assert.ok(res.body.accessToken);
+    assert.ok(res.body.refreshToken);
     assert.equal(res.body.email, "student@example.com");
   });
 
@@ -61,7 +62,8 @@ describe("Auth integration", () => {
       .post("/api/v1/auth/login")
       .send({ email: "login@example.com", password: "password123" });
     assert.equal(res.status, 200);
-    assert.ok(res.body.token);
+    assert.ok(res.body.accessToken);
+    assert.ok(res.body.refreshToken);
   });
 
   test("rejects login with the wrong password", async () => {
@@ -88,7 +90,7 @@ describe("Auth integration", () => {
     const registerRes = await request(app)
       .post("/api/v1/auth/register")
       .send({ email: "me@example.com", password: "password123" });
-    const res = await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${registerRes.body.token}`);
+    const res = await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${registerRes.body.accessToken}`);
     assert.equal(res.status, 200);
     assert.equal(res.body.email, "me@example.com");
   });

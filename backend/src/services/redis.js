@@ -12,6 +12,14 @@ export function createRedisClient() {
     retryStrategy: (times) => Math.min(times * 50, 2000),
     enableReadyCheck: false,
     enableOfflineQueue: true,
+    // BullMQ requires this to be null on any connection passed to a Queue
+    // or Worker — it manages retries for blocking commands itself, and
+    // ioredis's own retry limit (20 by default) would otherwise fight
+    // with that. Without this, `new Worker(...)` throws synchronously:
+    // "BullMQ: Your redis options maxRetriesPerRequest must be null" —
+    // which means the entire worker process crashes on startup, before
+    // processing a single job, regardless of how correctly it's deployed.
+    maxRetriesPerRequest: null,
   });
 
   redis.on("connect", () => {

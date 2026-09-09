@@ -2,7 +2,7 @@
 // NEW Hook: Handle async PDF uploads with job status polling
 
 import { useState, useCallback } from "react";
-import { useAuth } from "../api/AuthContext";
+import client from "../api/client.js";
 
 /**
  * useAsyncUpload: Manage PDF uploads with background job polling
@@ -18,7 +18,6 @@ import { useAuth } from "../api/AuthContext";
  *   - status: 'idle' | 'uploading' | 'parsing' | 'embedding' | 'ready' | 'error'
  */
 export function useAsyncUpload() {
-  const { apiClient } = useAuth();
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState("idle");
@@ -32,7 +31,7 @@ export function useAsyncUpload() {
 
       while (Date.now() - startTime < maxWaitMs) {
         try {
-          const response = await apiClient.get(`/upload/${pdfId}/status`);
+          const response = await client.get(`/upload/${pdfId}/status`);
           const { processingStatus, uploadJob, embedJob, chunksReady } = response.data;
 
           // Calculate overall progress
@@ -81,7 +80,7 @@ export function useAsyncUpload() {
 
       throw new Error("Upload processing timed out after 5 minutes");
     },
-    [apiClient]
+    []
   );
 
   const uploadPdf = useCallback(
@@ -96,7 +95,19 @@ export function useAsyncUpload() {
         formData.append("file", file);
         formData.append("subject", subject);
 
-        const uploadResponse = await apiClient.post("/upload", formData, {
+        // Same async job-queue pattern either way, just a different
+        // upload endpoint depending on file type — pollJobStatus below
+        // doesn't need to know or care which one was used, since all
+        // four write to the same Pdf document shape.
+        const isDocx = file.name?.toLowerCase().endsWith(".docx") ||
+          file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const isPptx = file.name?.toLowerCase().endsWith(".pptx") ||
+          file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        const isAudio = file.type?.startsWith("audio/") ||
+          /\.(mp3|mp4|wav|webm|ogg|m4a)$/i.test(file.name || "");
+        const endpoint = isDocx ? "/upload/docx" : isPptx ? "/upload/pptx" : isAudio ? "/upload/audio" : "/upload";
+
+        const uploadResponse = await client.post(endpoint, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
@@ -123,8 +134,36 @@ export function useAsyncUpload() {
         throw err;
       }
     },
-    [apiClient, pollJobStatus]
+    [pollJobStatus]
   );
 
-  return { uploadPdf, progress, error, status };
+  const addYoutubeVideo = useCallback(
+    async (videoUrl, subject = "General") => {
+      setError(null);
+      setProgress(0);
+      setStatus("uploading");
+
+      try {
+        const response = await client.post("/upload/youtube", { videoUrl, subject });
+        const { pdfId, uploadJobId, embedJobId, synthesisJobId } = response.data;
+
+        if (response.status !== 202) {
+          throw new Error("Request did not return 202 Accepted");
+        }
+
+        // Same status/polling endpoint as file uploads — see pollJobStatus's
+        // definition above; a YouTube source writes to the same Pdf shape.
+        const result = await pollJobStatus(pdfId);
+
+        return { pdfId, uploadJobId, embedJobId, synthesisJobId, status: "success", ...result };
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+        setStatus("error");
+        throw err;
+      }
+    },
+    [pollJobStatus]
+  );
+
+  return { uploadPdf, addYoutubeVideo, progress, error, status };
 }

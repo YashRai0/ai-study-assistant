@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { embedText } from "../services/embeddings.js";
-import { retrieveTopK, bestScore, SIMILARITY_THRESHOLD } from "../services/vectorStore.js";
+import { bestScore, SIMILARITY_THRESHOLD } from "../services/vectorStore.js";
+import { hybridRetrieve } from "../services/hybridRetrieval.js";
 import { streamAnswerFromNotes, streamExplainSimply } from "../services/llm.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiLimiter } from "../middleware/rateLimit.js";
@@ -55,9 +56,9 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
   }
 
   try {
-    const chunks = await Chunk.find({ pdfId, owner: req.user.id }).select("text page embedding").lean();
+    const chunks = await Chunk.find({ pdf: pdfId, owner: req.user.id }).select("text page embedding").lean();
     const queryEmbedding = await embedText(message);
-    const topChunks = retrieveTopK(chunks, queryEmbedding, 4);
+    const topChunks = hybridRetrieve(chunks, message, queryEmbedding, 4);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

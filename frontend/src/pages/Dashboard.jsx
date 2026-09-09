@@ -2,12 +2,20 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client.js";
 import UploadBox from "../components/UploadBox.jsx";
+import KnowledgeMap from "../components/KnowledgeMap.jsx";
+import StreakTracker from "../components/StreakTracker.jsx";
+import GoalSetup from "../components/GoalSetup.jsx";
+import ExamReadiness from "../components/ExamReadiness.jsx";
 
 export default function Dashboard() {
   const [pdfs, setPdfs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
   const [recentChats, setRecentChats] = useState([]);
+  const [reviewQueue, setReviewQueue] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [showGoalModal, setShowGoalModal] = useState(false);
 
   useEffect(() => {
     loadPdfs();
@@ -15,6 +23,17 @@ export default function Dashboard() {
       .get("/chat/recent")
       .then(({ data }) => setRecentChats(data.recent))
       .catch(() => setRecentChats([]));
+    client
+      .get("/learning/review-queue")
+      .then(({ data }) => setReviewQueue(data))
+      .catch(() => setReviewQueue(null));
+    client
+      .get("/learning/courses")
+      .then(({ data }) => {
+        setCourses(data.courses || []);
+        if (data.courses?.length > 0) setSelectedCourse(data.courses[0]._id);
+      })
+      .catch(() => setCourses([]));
   }, []);
 
   function loadPdfs() {
@@ -52,6 +71,64 @@ export default function Dashboard() {
         doing? Check your{" "}
         <Link to="/analytics" className="underline">analytics dashboard</Link>.
       </p>
+
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link to="/study" className="rounded-full bg-ink-900 px-4 py-2 text-sm text-paper">Your study dashboard</Link>
+        <Link to="/review" className="rounded-full border border-ink-900 px-4 py-2 text-sm text-ink-900">Review due material</Link>
+      </div>
+
+      {reviewQueue?.dueCount > 0 && (
+        <section className="mt-8 rounded-2xl border border-highlight bg-highlight/10 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-semibold text-ink-900">
+              {reviewQueue.dueCount} concept{reviewQueue.dueCount === 1 ? "" : "s"} due for review
+            </h2>
+            <Link to="/study" className="rounded-full bg-ink-900 px-4 py-1.5 text-sm text-paper">Review now</Link>
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {reviewQueue.items.slice(0, 5).map((item) => (
+              <li key={item.conceptId} className="flex items-center justify-between text-sm text-ink-600">
+                <span>{item.conceptName} <span className="text-ink-400">· {item.courseTitle}</span></span>
+                <span className="text-ink-400">{Math.round((item.mastery || 0) * 100)}% mastery</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {selectedCourse && (
+        <section className="mt-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-semibold text-ink-900">Your courses</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowGoalModal(true)}
+                className="rounded-full border border-ink-900 px-3 py-1.5 text-sm text-ink-900"
+              >
+                Set goal
+              </button>
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="rounded-lg border border-ink-100 p-2 text-sm"
+              >
+                {courses.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <StreakTracker courseId={selectedCourse} />
+          <ExamReadiness courseId={selectedCourse} />
+          <KnowledgeMap courseId={selectedCourse} />
+        </section>
+      )}
+
+      {showGoalModal && selectedCourse && (
+        <GoalSetup courseId={selectedCourse} onClose={() => setShowGoalModal(false)} />
+      )}
 
       <div className="mt-8">
         <UploadBox onUploaded={loadPdfs} />

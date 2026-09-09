@@ -7,13 +7,14 @@ import mongoose from "mongoose";
 // too. fullText stays here since it's needed whole for summary/flashcard/
 // quiz generation and is far smaller than the embedding data ever was.
 const pdfSchema = new mongoose.Schema({
+  course: { type: mongoose.Schema.Types.ObjectId, ref: "Course", default: null, index: true },
   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
   filename: { type: String, required: true },
   subject: { type: String, default: "General", trim: true, index: true },
-  extractionMethod: { type: String, enum: ["text", "ocr"], default: "text" },
+  extractionMethod: { type: String, enum: ["text", "ocr", "docx", "pptx", "youtube", "audio"], default: "text" },
   contentHash: { type: String, required: true }, // SHA-256 of the raw file bytes, for duplicate detection
-  gridFsFileId: { type: mongoose.Schema.Types.ObjectId, required: true }, // original PDF bytes, stored via GridFS
-  fullText: { type: String, required: true },
+  gridFsFileId: { type: mongoose.Schema.Types.ObjectId, required: false }, // original file bytes via GridFS; null for sources with no uploaded file (e.g. YouTube)
+  fullText: { type: String, default: "" },
   pageCount: { type: Number, default: null }, // Set by uploadPdf worker
   chunkCount: { type: Number, default: 0 }, // avoids a Chunk count query just to show this on the Dashboard
   
@@ -26,7 +27,8 @@ const pdfSchema = new mongoose.Schema({
   },
   uploadJobId: { type: String, default: null }, // BullMQ job ID for PDF parsing
   embedJobId: { type: String, default: null }, // BullMQ job ID for embedding
-  synthesisJobId: { type: String, default: null }, // BullMQ job ID for summary/flashcards (optional)
+  synthesisJobId: { type: String, default: null },
+  learningJobId: { type: String, default: null }, // BullMQ job ID for summary/flashcards (optional)
   processingError: { type: String, default: null }, // Error message if job failed
   
   uploadedAt: { type: Date, default: Date.now },

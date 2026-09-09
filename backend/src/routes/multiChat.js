@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { embedText } from "../services/embeddings.js";
 import {
-  retrieveTopK,
   bestScore,
   SIMILARITY_THRESHOLD,
 } from "../services/vectorStore.js";
+import { hybridRetrieve } from "../services/hybridRetrieval.js";
 import { streamAnswerAcrossNotes } from "../services/llm.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiLimiter } from "../middleware/rateLimit.js";
@@ -13,6 +13,7 @@ import { multiChatMessageSchema } from "../validation/schemas.js";
 import Chunk from "../models/Chunk.js";
 import MultiChatMessage from "../models/MultiChatMessage.js";
 import logger from "../utils/logger.js";
+import { asQueryString } from "../utils/asQueryString.js";
 
 const router = Router();
 
@@ -63,7 +64,7 @@ router.post("/", validate(multiChatMessageSchema), async (req, res) => {
 
       const queryEmbedding = await embedText(message);
 
-      const topChunks = retrieveTopK(chunks, queryEmbedding, 6);
+      const topChunks = hybridRetrieve(chunks, message, queryEmbedding, 6);
 
       if (bestScore(topChunks) < SIMILARITY_THRESHOLD) {
         fullAnswer =
@@ -116,7 +117,7 @@ router.post("/", validate(multiChatMessageSchema), async (req, res) => {
 });
 
 router.get("/history", async (req, res) => {
-  const scope = req.query.scope || ALL_SCOPE;
+  const scope = asQueryString(req.query.scope, ALL_SCOPE);
 
   const history = await MultiChatMessage.find({
     owner: req.user.id,
@@ -129,7 +130,7 @@ router.get("/history", async (req, res) => {
 });
 
 router.delete("/history", async (req, res) => {
-  const scope = req.query.scope || ALL_SCOPE;
+  const scope = asQueryString(req.query.scope, ALL_SCOPE);
 
   await MultiChatMessage.deleteMany({
     owner: req.user.id,

@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { uploadPdfQueue, embedChunksQueue, ocrQueue, synthesisQueue } from "../services/queues.js";
+import { ALL_QUEUES } from "../services/queues.js";
 import { requireAuth } from "../middleware/auth.js";
+import { requireRole } from "../middleware/requireRole.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireRole("admin"));
 
 /**
  * Admin-only monitoring dashboard data
@@ -12,28 +14,17 @@ router.use(requireAuth);
  * GET /api/v1/admin/queue-status
  *
  * Returns current state of all BullMQ queues (job counts, recent jobs, errors)
- * TODO: Add role-based access control (admin-only)
  */
 router.get("/queue-status", async (req, res) => {
-  // TODO: Check if req.user is admin
-  // For now, allow any authenticated user (since this is internal-only)
-
   try {
-    const queues = [
-      { queue: uploadPdfQueue, name: "uploadPdf" },
-      { queue: embedChunksQueue, name: "embedChunks" },
-      { queue: ocrQueue, name: "ocr" },
-      { queue: synthesisQueue, name: "synthesis" },
-    ];
-
     const status = {};
 
-    for (const { queue, name } of queues) {
+    for (const queue of ALL_QUEUES) {
       const counts = await queue.getJobCounts();
       const failedJobs = await queue.getFailed(0, 10); // Last 10 failed
       const recentJobs = await queue.getCompletedCount(); // Total completed
 
-      status[name] = {
+      status[queue.name] = {
         counts,
         failedJobCount: failedJobs.length,
         recentFailures: failedJobs.slice(0, 3).map((job) => ({
@@ -62,7 +53,7 @@ router.get("/job/:jobId", async (req, res) => {
   const { jobId } = req.params;
 
   try {
-    const allQueues = [uploadPdfQueue, embedChunksQueue, ocrQueue, synthesisQueue];
+    const allQueues = ALL_QUEUES;
 
     for (const queue of allQueues) {
       const job = await queue.getJob(jobId);
@@ -98,7 +89,7 @@ router.post("/job/:jobId/retry", async (req, res) => {
   const { jobId } = req.params;
 
   try {
-    const allQueues = [uploadPdfQueue, embedChunksQueue, ocrQueue, synthesisQueue];
+    const allQueues = ALL_QUEUES;
 
     for (const queue of allQueues) {
       const job = await queue.getJob(jobId);
@@ -131,7 +122,7 @@ router.post("/job/:jobId/retry", async (req, res) => {
 router.post("/drain-queues", async (req, res) => {
   // TODO: Add confirmation token or require specific header
   try {
-    const allQueues = [uploadPdfQueue, embedChunksQueue, ocrQueue, synthesisQueue];
+    const allQueues = ALL_QUEUES;
 
     for (const queue of allQueues) {
       await queue.drain();

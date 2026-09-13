@@ -16,6 +16,7 @@ import { connectDb } from "../src/db/mongoose.js";
 import { getRedis, closeRedis } from "../src/services/redis.js";
 import logger from "../src/utils/logger.js";
 import { retryStrategies, isRetryableError, logRetry } from "../src/services/jobRetry.js";
+import { withJobHardening } from "../src/services/jobHardening.js";
 
 // Import processors
 import { processPdfUpload } from "./processPdfUpload.js";
@@ -29,23 +30,26 @@ import { processSynthesis } from "./processSynthesis.js";
 import { processLearning } from "./processLearning.js";
 import { processLearningEvent } from "./processLearningEvent.js";
 
-// Create workers (one per queue)
+// Create workers (one per queue). Each processor is wrapped with
+// withJobHardening so retryStrategies' timeout and error-classification
+// config (previously read nowhere — see jobHardening.js) actually takes
+// effect, without needing to touch any individual processor's own logic.
 await connectDb();
 const workers = [
-  new Worker("uploadPdf", processPdfUpload, { connection: getRedis(), concurrency: 2 }),
-  new Worker("uploadDocx", processDocxUpload, { connection: getRedis(), concurrency: 2 }),
-  new Worker("uploadPptx", processPptxUpload, { connection: getRedis(), concurrency: 2 }),
-  new Worker("ingestYoutube", processYoutubeIngest, { connection: getRedis(), concurrency: 2 }),
-  new Worker("uploadAudio", processAudioUpload, { connection: getRedis(), concurrency: 2 }),
+  new Worker("uploadPdf", withJobHardening("uploadPdf", processPdfUpload), { connection: getRedis(), concurrency: 2 }),
+  new Worker("uploadDocx", withJobHardening("uploadDocx", processDocxUpload), { connection: getRedis(), concurrency: 2 }),
+  new Worker("uploadPptx", withJobHardening("uploadPptx", processPptxUpload), { connection: getRedis(), concurrency: 2 }),
+  new Worker("ingestYoutube", withJobHardening("ingestYoutube", processYoutubeIngest), { connection: getRedis(), concurrency: 2 }),
+  new Worker("uploadAudio", withJobHardening("uploadAudio", processAudioUpload), { connection: getRedis(), concurrency: 2 }),
 
-  new Worker("embedChunks", processEmbedChunks, { connection: getRedis(), concurrency: 1 }),
+  new Worker("embedChunks", withJobHardening("embedChunks", processEmbedChunks), { connection: getRedis(), concurrency: 1 }),
 
-  new Worker("ocr", processOcr, { connection: getRedis(), concurrency: 1 }),
+  new Worker("ocr", withJobHardening("ocr", processOcr), { connection: getRedis(), concurrency: 1 }),
 
-  new Worker("synthesis", processSynthesis, { connection: getRedis(), concurrency: 2 }),
+  new Worker("synthesis", withJobHardening("synthesis", processSynthesis), { connection: getRedis(), concurrency: 2 }),
 
-  new Worker("learning", processLearning, { connection: getRedis(), concurrency: 1 }),
-  new Worker("learningEvent", processLearningEvent, { connection: getRedis(), concurrency: 4 }),
+  new Worker("learning", withJobHardening("learning", processLearning), { connection: getRedis(), concurrency: 1 }),
+  new Worker("learningEvent", withJobHardening("learningEvent", processLearningEvent), { connection: getRedis(), concurrency: 4 }),
 ];
 
 // Log job lifecycle events

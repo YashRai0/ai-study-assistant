@@ -21,7 +21,7 @@ import { API_BASE_URL, TOKEN_KEY } from "./client.js";
  *   unmount). The backend detects the resulting disconnect and stops
  *   pulling tokens from the LLM for a response nobody will see.
  */
-export async function streamChatRequest(path, body, { onToken, signal } = {}) {
+export async function streamChatRequest(path, body, { onToken, onMeta, signal } = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
@@ -75,11 +75,16 @@ export async function streamChatRequest(path, body, { onToken, signal } = {}) {
         const payload = JSON.parse(line.slice(6));
 
         if (payload.error) throw new Error(payload.error);
+        if (payload.meta) {
+          onMeta?.(payload.meta);
+        }
         if (payload.token) {
           full += payload.token;
           onToken?.(payload.token, full);
         }
-        // payload.done needs no handling — the loop ends naturally when the stream closes.
+        if (payload.done && (payload.sources || payload.confidence)) {
+          onMeta?.({ sources: payload.sources, confidence: payload.confidence });
+        }
       }
     }
   } catch (err) {

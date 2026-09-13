@@ -58,6 +58,20 @@ export default function Chat() {
               return updated;
             });
           },
+          onMeta: (meta) => {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  sources: meta.sources ?? last.sources,
+                  confidence: meta.confidence ?? last.confidence,
+                };
+              }
+              return updated;
+            });
+          },
         }
       );
       if (readAloud) speak(full);
@@ -135,7 +149,38 @@ export default function Chat() {
                 m.role === "user" ? "ml-auto bg-ink-900 text-paper" : "bg-white/80 text-ink-900"
               }`}
             >
-              {m.content || (isStreamingPlaceholder ? "Thinking…" : "")}
+              <div>{m.content || (isStreamingPlaceholder ? "Thinking…" : "")}</div>
+              {m.role === "assistant" && !isStreamingPlaceholder && (m.sources?.length > 0 || m.confidence) && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-ink-100/70 pt-2 text-xs">
+                  {m.confidence === "HIGH" && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Verified in Notes
+                    </span>
+                  )}
+                  {m.confidence === "MEDIUM" && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      Partial Match
+                    </span>
+                  )}
+                  {m.confidence === "LOW" && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-ink-100 px-2 py-0.5 font-medium text-ink-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-ink-400" />
+                      General Knowledge
+                    </span>
+                  )}
+                  {m.sources?.map((s, idx) => (
+                    <span
+                      key={idx}
+                      title={s.excerpt || `From page ${s.page} of ${s.filename}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-ink-100 bg-paper/80 px-2 py-0.5 text-ink-600 hover:bg-white hover:text-ink-900 cursor-help"
+                    >
+                      📚 Page {s.page} {s.score ? `(${s.score}%)` : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

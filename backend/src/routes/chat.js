@@ -42,7 +42,7 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
   const { message, mode } = req.body;
 
   const doc = await Pdf.findOne({ _id: pdfId, owner: req.user.id }).select(
-    "_id processingStatus processingError"
+    "_id filename processingStatus processingError"
   );
   if (!doc) return res.status(404).json({ error: "PDF not found." });
 
@@ -60,6 +60,24 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
     const queryEmbedding = await embedText(message);
     const topChunks = hybridRetrieve(chunks, message, queryEmbedding, 4);
 
+    const topScore = bestScore(topChunks);
+    const confidence =
+      topScore >= 0.65 ? "HIGH" : topScore >= SIMILARITY_THRESHOLD ? "MEDIUM" : "LOW";
+
+    const sources =
+      confidence !== "LOW"
+        ? topChunks
+            .filter((c) => c.page !== undefined && c.page !== null)
+            .map((c) => ({
+              filename: doc.filename || "Uploaded Document",
+              page: c.page,
+              score: Math.round((c.score || 0) * 100),
+              excerpt: (c.text || "").slice(0, 160).trim() + "...",
+            }))
+            .filter((c, idx, arr) => arr.findIndex((x) => x.page === c.page) === idx)
+            .slice(0, 3)
+        : [];
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -70,13 +88,14 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
       if (!res.writableEnded) controller.abort();
     });
 
-    const sendToken = (token) => res.write(`data: ${JSON.stringify({ token })}
+    const sendToken = (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`);
 
-`);
+    // Emit initial metadata event with confidence and sources
+    res.write(`data: ${JSON.stringify({ meta: { confidence, sources } })}\n\n`);
 
     let fullAnswer;
-    if (mode !== "explain" && bestScore(topChunks) < SIMILARITY_THRESHOLD) {
-      fullAnswer = "I couldn'''t find this information in your uploaded notes.";
+    if (mode !== "explain" && confidence === "LOW") {
+      fullAnswer = "I couldn't find this information in your uploaded notes.";
       sendToken(fullAnswer);
     } else if (mode === "explain") {
       fullAnswer = await streamExplainSimply(message, topChunks, sendToken, controller.signal);
@@ -85,14 +104,19 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
     }
 
     if (!controller.signal.aborted) {
-      res.write(`data: ${JSON.stringify({ done: true })}
-
-`);
+      res.write(`data: ${JSON.stringify({ done: true, confidence, sources })}\n\n`);
       res.end();
     }
 
     await ChatMessage.create({ pdf: pdfId, owner: req.user.id, role: "user", content: message });
-    await ChatMessage.create({ pdf: pdfId, owner: req.user.id, role: "assistant", content: fullAnswer });
+    await ChatMessage.create({
+      pdf: pdfId,
+      owner: req.user.id,
+      role: "assistant",
+      content: fullAnswer,
+      sources,
+      confidence,
+    });
   } catch (err) {
     logger.error({ reqId: req.id, err }, "Chat error");
     if (!res.headersSent) {

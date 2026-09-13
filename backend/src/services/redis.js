@@ -46,7 +46,15 @@ export function getRedis() {
 
 export async function closeRedis() {
   if (redisInstance) {
-    await redisInstance.quit();
+    try {
+      if (redisInstance.status === "ready" || redisInstance.status === "connect") {
+        await redisInstance.quit();
+      } else {
+        redisInstance.disconnect();
+      }
+    } catch {
+      redisInstance.disconnect();
+    }
     redisInstance = null;
   }
 }

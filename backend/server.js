@@ -13,9 +13,12 @@ import { connectDb } from "./src/db/mongoose.js";
 import logger from "./src/utils/logger.js";
 import { getRedis, closeRedis } from "./src/services/redis.js";
 import { attachJobListeners } from "./src/services/jobListeners.js";
+import { startWorkers } from "./workers/startWorkers.js";
 
 const PORT = process.env.PORT || 5000;
+const RUN_WORKERS_IN_PROCESS = process.env.RUN_WORKERS_IN_PROCESS !== "false";
 let server;
+let workers = [];
 
 connectDb()
   .then(() => {
@@ -23,9 +26,18 @@ connectDb()
     getRedis(); // Lazy-init singleton
     attachJobListeners(); // Listen for queue events (job completion, failure)
 
+    if (RUN_WORKERS_IN_PROCESS) {
+      workers = startWorkers();
+      logger.info("BullMQ workers started in-process with API server");
+    } else {
+      logger.info("BullMQ workers running out-of-process (RUN_WORKERS_IN_PROCESS=false)");
+    }
+
     server = app.listen(PORT, () => {
       logger.info(`AI Study Assistant backend running on http://localhost:${PORT}`);
-      logger.info("BullMQ queues initialized (awaiting worker processes)");
+      if (!RUN_WORKERS_IN_PROCESS) {
+        logger.info("BullMQ queues initialized (awaiting standalone worker processes)");
+      }
     });
   })
   .catch((err) => {
@@ -63,6 +75,14 @@ const shutdown = async (signal) => {
       });
 
       logger.info("HTTP server closed.");
+    }
+
+    if (workers && workers.length > 0) {
+      logger.info("Shutting down in-process workers...");
+      for (const worker of workers) {
+        await worker.close();
+      }
+      logger.info("In-process workers closed.");
     }
 
     await closeRedis();

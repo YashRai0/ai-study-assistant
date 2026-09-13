@@ -66,6 +66,10 @@ services:
       
       # Optional tuning
       SIMILARITY_THRESHOLD: ${SIMILARITY_THRESHOLD:-0.3}
+      # In multi-container compose, a separate worker container runs alongside backend.
+      # Default to false here to avoid duplicate processing. On Railway/Render (single service),
+      # the default without docker-compose is true.
+      RUN_WORKERS_IN_PROCESS: ${RUN_WORKERS_IN_PROCESS:-false}
     
     depends_on:
       redis:

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import client from "../api/client.js";
+import client, { formatApiError } from "../api/client.js";
 import UploadBox from "../components/UploadBox.jsx";
 import KnowledgeMap from "../components/KnowledgeMap.jsx";
 import StreakTracker from "../components/StreakTracker.jsx";
@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState("");
   const [showGoalModal, setShowGoalModal] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     loadPdfs();
@@ -39,10 +41,11 @@ export default function Dashboard() {
 
   function loadPdfs() {
     setLoading(true);
+    setLoadError("");
     client
       .get("/upload")
       .then(({ data }) => setPdfs(data.pdfs))
-      .catch(() => setPdfs([]))
+      .catch((err) => setLoadError(formatApiError(err, "Couldn't load your notes right now.")))
       .finally(() => setLoading(false));
   }
 
@@ -51,11 +54,12 @@ export default function Dashboard() {
       return;
     }
     setDeletingId(pdf.id);
+    setDeleteError("");
     try {
       await client.delete(`/upload/${pdf.id}`);
       setPdfs((prev) => prev.filter((p) => p.id !== pdf.id));
-    } catch {
-      window.alert("Couldn't delete this PDF right now. Please try again.");
+    } catch (err) {
+      setDeleteError(formatApiError(err, "Couldn't delete this PDF right now. Please try again."));
     } finally {
       setDeletingId(null);
     }
@@ -95,6 +99,41 @@ export default function Dashboard() {
             ))}
           </ul>
         </section>
+      )}
+
+      {reviewQueue && reviewQueue.dueCount === 0 && (
+        <section className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🎉</span>
+              <div>
+                <p className="font-semibold text-emerald-950 text-sm">You're all caught up on spaced reviews!</p>
+                <p className="text-xs text-emerald-700">No concepts due for review today. Great work staying ahead of the forgetting curve.</p>
+              </div>
+            </div>
+            <Link to="/review" className="text-xs font-semibold text-emerald-800 underline hover:text-emerald-950">
+              View queue
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {deleteError && (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <span>{deleteError}</span>
+          <button onClick={() => setDeleteError("")} className="font-semibold text-red-800 hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <span>{loadError}</span>
+          <button onClick={loadPdfs} className="font-semibold text-red-800 underline hover:text-red-950">
+            Try again
+          </button>
+        </div>
       )}
 
       {selectedCourse && (
@@ -143,9 +182,15 @@ export default function Dashboard() {
         {loading ? (
           <p className="text-ink-400">Loading…</p>
         ) : pdfs.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-ink-100 p-6 text-center text-ink-400">
-            Nothing here yet — upload a PDF above to get started.
-          </p>
+          <div className="rounded-2xl border border-dashed border-ink-200 bg-white/70 p-8 text-center sm:p-12 shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-highlight/20 text-2xl">
+              📚
+            </div>
+            <h3 className="mt-4 font-display text-lg font-semibold text-ink-900">Your study space is empty</h3>
+            <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+              Upload your lecture slides, notes, or textbook chapters above to unlock flashcards, practice quizzes, and an adaptive AI study coach.
+            </p>
+          </div>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2">
             {pdfs.map((pdf) => (

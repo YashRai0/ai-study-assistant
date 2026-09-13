@@ -92,4 +92,21 @@ client.interceptors.response.use(
   }
 );
 
+export function formatApiError(err, fallback = "Something went wrong. Please try again.") {
+  if (!err) return fallback;
+  if (err.code === "ERR_NETWORK" || (typeof window !== "undefined" && !window.navigator.onLine)) {
+    return "You appear to be offline or unable to reach the server. Please check your internet connection.";
+  }
+  if (err.response?.status === 429) {
+    return "Too many requests. Please wait a moment before trying again.";
+  }
+  if (err.response?.status === 409) {
+    return err.response?.data?.error || "This document is still being processed. You can leave this page—we'll keep working on it.";
+  }
+  if (err.response?.status >= 500) {
+    return "The server encountered a temporary issue. Your progress and notes are safe. Please try again in a moment.";
+  }
+  return err.response?.data?.error || err.message || fallback;
+}
+
 export default client;

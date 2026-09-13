@@ -54,14 +54,29 @@ export async function buildStudySessionPlan({ userId, courseId, minutes }) {
     if (!entry) return;
     const m = minutesFor(shares[key], minutes);
     used += m;
+    // Same substitution as getNextAction (nextAction.js): a
+    // PREREQUISITE_GAP entry's own concept is the thing that's blocked,
+    // not the thing to actually spend time on — pushPhase used to always
+    // use entry.concept regardless of type, so a session phase labeled
+    // "Strengthen a foundational concept first" was silently handing the
+    // student the blocked concept instead of the weak prerequisite it
+    // was telling them to strengthen. entry.prerequisite is already
+    // computed for every ranked concept (see rankConcepts), so this
+    // needs no extra query.
+    const target = entry.type === "PREREQUISITE_GAP" && entry.prerequisite
+      ? { _id: entry.prerequisite.concept._id, name: entry.prerequisite.concept.name }
+      : entry.concept;
+    const masteryBefore = entry.type === "PREREQUISITE_GAP" && entry.prerequisite
+      ? entry.prerequisite.mastery
+      : entry.mastery;
     phases.push({
       phase: key,
       type,
       label,
       minutes: m,
-      conceptId: entry.concept._id,
-      conceptName: entry.concept.name,
-      masteryBefore: entry.mastery,
+      conceptId: target._id,
+      conceptName: target.name,
+      masteryBefore,
     });
   }
 

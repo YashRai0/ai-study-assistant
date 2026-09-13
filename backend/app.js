@@ -68,7 +68,6 @@ app.use(express.json());
 app.use(requestId);
 app.use(generalLimiter);
 
-app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 // API versioned under /v1
 const v1 = express.Router();

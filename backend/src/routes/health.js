@@ -1,15 +1,18 @@
 import { Router } from "express";
 import mongoose from "mongoose";
+import { getRedis } from "../services/redis.js";
 
 const router = Router();
 
 router.get("/health", async (req, res) => {
   const health = {
     status: "ok",
+    version: "2.1.0",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     checks: {
       database: "unknown",
+      redis: "unknown",
       memory: "ok",
     },
   };
@@ -21,6 +24,16 @@ router.get("/health", async (req, res) => {
   } catch {
     health.checks.database = "error";
     health.status = "degraded";
+  }
+
+  // Check Redis
+  try {
+    const redis = getRedis();
+    await redis.ping();
+    health.checks.redis = "ok";
+  } catch {
+    health.checks.redis = "error";
+    if (health.status === "ok") health.status = "degraded";
   }
 
   // Check memory usage. Higher (worse) threshold checked first — checking

@@ -57,6 +57,7 @@ services:
       # API Keys & Secrets
       GROQ_API_KEY: ${GROQ_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
       
       # Server config
       CORS_ORIGIN: http://localhost:5173
@@ -71,6 +72,13 @@ services:
         condition: service_healthy
       mongo:
         condition: service_started
+    healthcheck:
+      # node:22-slim doesn't ship curl — use Node's own http client instead.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     
     networks:
       - ai-network
@@ -88,6 +96,8 @@ services:
       
       # API Keys
       GROQ_API_KEY: ${GROQ_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
       
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}

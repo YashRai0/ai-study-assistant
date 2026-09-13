@@ -6,6 +6,7 @@ import KnowledgeMap from "../components/KnowledgeMap.jsx";
 import StreakTracker from "../components/StreakTracker.jsx";
 import GoalSetup from "../components/GoalSetup.jsx";
 import ExamReadiness from "../components/ExamReadiness.jsx";
+import TodayStudyCard from "../components/TodayStudyCard.jsx";
 
 export default function Dashboard() {
   const [pdfs, setPdfs] = useState([]);
@@ -120,6 +121,10 @@ export default function Dashboard() {
               </select>
             </div>
           </div>
+          <TodayStudyCard
+            courseId={selectedCourse}
+            courseTitle={courses.find((c) => c._id === selectedCourse)?.title}
+          />
           <StreakTracker courseId={selectedCourse} />
           <ExamReadiness courseId={selectedCourse} />
           <KnowledgeMap courseId={selectedCourse} />

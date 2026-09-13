@@ -301,7 +301,7 @@ router.post("/courses/:courseId/concepts/:conceptId/tutor/next", validate(tutorN
     StudentConcept.findOne({ user: req.user.id, course: req.params.courseId, concept: req.params.conceptId })
       .select("mastery misconceptionRisk").lean(),
     Misconception.findOne({ user: req.user.id, course: req.params.courseId, concept: req.params.conceptId, resolved: false })
-      .select("description risk").lean(),
+      .select("description risk").sort({ risk: -1 }).lean(),
   ]);
 
   const decision = decideInterventionStrategy({

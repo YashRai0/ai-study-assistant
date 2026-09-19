@@ -99,9 +99,32 @@ export function hybridRetrieve(chunks, query, queryEmbedding, k = 4) {
  * from — reranking only among candidates already narrowed to exactly k
  * would defeat the point.
  */
-export async function hybridRetrieveWithNeuralRerank(chunks, query, queryEmbedding, k = 4, { poolMultiplier = 3 } = {}) {
-  const pool = hybridRetrieve(chunks, query, queryEmbedding, k * poolMultiplier);
-  if (!pool.length) return [];
-  const reranked = await rerankByRelevance(query, pool, { topK: k });
+/**
+ * Hybrid retrieval with selective neural (LLM-based) reranking (Step 9).
+ * Evaluates candidate confidence: if the top candidate already has HIGH
+ * confidence (score >= 0.65), the expensive LLM reranking step is skipped entirely.
+ * For MEDIUM/LOW confidence, only a bounded candidate pool (at most 10 chunks)
+ * is sent to the LLM reranker, never the full corpus.
+ */
+export async function hybridRetrieveWithNeuralRerank(
+  chunks,
+  query,
+  queryEmbedding,
+  k = 4,
+  { poolMultiplier = 3, maxRerankCandidates = 10, confidenceThreshold = 0.65 } = {}
+) {
+  const poolLimit = Math.min(k * poolMultiplier, maxRerankCandidates);
+  const candidates = hybridRetrieve(chunks, query, queryEmbedding, poolLimit);
+  if (!candidates.length) return [];
+
+  // High confidence bypass: skip LLM call when heuristic ranking is already strong
+  const topScore = candidates[0]?.score ?? 0;
+  if (topScore >= confidenceThreshold) {
+    return candidates.slice(0, k);
+  }
+
+  // Bounded candidate pool for neural reranking
+  const rerankPool = candidates.slice(0, maxRerankCandidates);
+  const reranked = await rerankByRelevance(query, rerankPool, { topK: k });
   return reranked.map(({ relevanceScore, ...rest }) => rest);
 }

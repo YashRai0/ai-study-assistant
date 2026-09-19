@@ -25,13 +25,26 @@ const outcomeSchema = new mongoose.Schema({
   // Back-reference to the pending question this outcome resolved, for
   // anything that needs the full intervention content/question text
   // rather than just the strategy label.
+  course: { type: mongoose.Schema.Types.ObjectId, ref: "Course", default: null, index: true },
   interaction: { type: mongoose.Schema.Types.ObjectId, ref: "TutorInteraction", default: null },
   outcome: { type: String, enum: ["success", "partial", "failure"], required: true },
   masteryDelta: { type: Number, default: 0 },
+  beforeMastery: { type: Number, default: null },
+  afterMastery: { type: Number, default: null },
+  accepted: { type: Boolean, default: true },
+  completed: { type: Boolean, default: true },
+  followUpCorrect: { type: Boolean, default: null },
+  timeSpentMs: { type: Number, default: null },
+  questionDifficulty: { type: Number, default: null },
+  misconceptionBefore: { type: String, default: null },
+  misconceptionAfter: { type: String, default: null },
+  retentionCheckpointHours: { type: Number, default: null },
   createdAt: { type: Date, default: Date.now, index: true },
 }, { timestamps: true });
 
 outcomeSchema.index({ user: 1, eventId: 1 }, { unique: true, sparse: true });
 outcomeSchema.index({ user: 1, strategy: 1 });
+outcomeSchema.index({ user: 1, course: 1, createdAt: -1 });
+outcomeSchema.index({ concept: 1, strategy: 1 });
 
 export default mongoose.model("InterventionOutcome", outcomeSchema);

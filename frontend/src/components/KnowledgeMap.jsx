@@ -36,9 +36,12 @@ export default function KnowledgeMap({ courseId }) {
 
   useEffect(() => {
     if (!courseId) return;
+    const controller = new AbortController();
+    setLoading(true);
+
     Promise.all([
-      client.get(`/learning/courses/${courseId}/concepts`),
-      client.get(`/learning/courses/${courseId}/mastery`),
+      client.get(`/learning/courses/${courseId}/concepts`, { signal: controller.signal }),
+      client.get(`/learning/courses/${courseId}/mastery`, { signal: controller.signal }),
     ])
       .then(([{ data: c }, { data: m }]) => {
         setConcepts(c.concepts || []);
@@ -48,7 +51,19 @@ export default function KnowledgeMap({ courseId }) {
         });
         setMastery(masteryMap);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        console.error("Error loading knowledge map:", err);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
   }, [courseId]);
 
   const getMasteryColor = (conceptId) => masteryColor(mastery[conceptId] || 0);
@@ -84,16 +99,26 @@ export default function KnowledgeMap({ courseId }) {
           const label = masteryLabel(m);
           const isSelected = selected === c._id;
           const unlocks = dependentsByConceptId.get(c._id) || [];
+          const weakPrereqs = (c.prerequisites || []).filter((p) => (mastery[p._id] || 0) < 0.5);
+          const isBlocked = weakPrereqs.length > 0 && m < 0.5;
+
           return (
             <div
               key={c._id}
               onClick={() => setSelected(isSelected ? null : c._id)}
-              className="cursor-pointer rounded-lg border p-3 hover:bg-ink-50"
+              className={`cursor-pointer rounded-lg border p-3 transition-colors hover:bg-ink-50 ${isSelected ? "ring-2 ring-ink-900/10" : ""}`}
               style={{ borderLeftColor: getMasteryColor(c._id), borderLeftWidth: "4px" }}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="font-medium text-ink-900">{c.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-ink-900">{c.name}</p>
+                    {isBlocked && (
+                      <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                        Prerequisite blocked
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-ink-400">{label}</p>
                 </div>
                 <div className="ml-2 flex items-center gap-1">
@@ -109,9 +134,33 @@ export default function KnowledgeMap({ courseId }) {
                   <span className="text-sm font-semibold text-ink-900">{Math.round(m * 100)}%</span>
                 </div>
               </div>
+
               {isSelected && (
                 <div className="mt-2 border-t border-ink-100 pt-2">
                   <p className="text-xs text-ink-600">{c.description || "No description."}</p>
+
+                  {isBlocked && (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-amber-800">
+                          ⚠️ Blocked by weak prerequisite: {weakPrereqs[0].name} ({Math.round((mastery[weakPrereqs[0]._id] || 0) * 100)}% mastery)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(weakPrereqs[0]._id);
+                          }}
+                          className="rounded bg-amber-800 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-900 transition-colors"
+                        >
+                          Study {weakPrereqs[0].name}
+                        </button>
+                      </div>
+                      <p className="mt-1 text-amber-700">
+                        Recommended action: Strengthen foundational concept before advancing.
+                      </p>
+                    </div>
+                  )}
 
                   {(c.prerequisites?.length > 0 || unlocks.length > 0) && (
                     <div className="mt-3 flex items-stretch gap-2 overflow-x-auto pb-1">

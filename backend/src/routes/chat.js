@@ -103,10 +103,10 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
       fullAnswer = await streamAnswerFromNotes(message, topChunks, sendToken, controller.signal);
     }
 
-    if (!controller.signal.aborted) {
-      res.write(`data: ${JSON.stringify({ done: true, confidence, sources })}\n\n`);
-      res.end();
-    }
+    if (controller.signal.aborted) return;
+
+    res.write(`data: ${JSON.stringify({ done: true, confidence, sources })}\n\n`);
+    res.end();
 
     await ChatMessage.create({ pdf: pdfId, owner: req.user.id, role: "user", content: message });
     await ChatMessage.create({

@@ -21,32 +21,48 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    loadPdfs();
+    const controller = new AbortController();
+    loadPdfs(controller.signal);
     client
-      .get("/chat/recent")
+      .get("/chat/recent", { signal: controller.signal })
       .then(({ data }) => setRecentChats(data.recent))
-      .catch(() => setRecentChats([]));
+      .catch(() => {
+        if (!controller.signal.aborted) setRecentChats([]);
+      });
     client
-      .get("/learning/review-queue")
+      .get("/learning/review-queue", { signal: controller.signal })
       .then(({ data }) => setReviewQueue(data))
-      .catch(() => setReviewQueue(null));
+      .catch(() => {
+        if (!controller.signal.aborted) setReviewQueue(null);
+      });
     client
-      .get("/learning/courses")
+      .get("/learning/courses", { signal: controller.signal })
       .then(({ data }) => {
         setCourses(data.courses || []);
         if (data.courses?.length > 0) setSelectedCourse(data.courses[0]._id);
       })
-      .catch(() => setCourses([]));
+      .catch(() => {
+        if (!controller.signal.aborted) setCourses([]);
+      });
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
-  function loadPdfs() {
+  function loadPdfs(signal) {
     setLoading(true);
     setLoadError("");
     client
-      .get("/upload")
+      .get("/upload", signal ? { signal } : {})
       .then(({ data }) => setPdfs(data.pdfs))
-      .catch((err) => setLoadError(formatApiError(err, "Couldn't load your notes right now.")))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (signal?.aborted) return;
+        setLoadError(formatApiError(err, "Couldn't load your notes right now."));
+      })
+      .finally(() => {
+        if (!signal?.aborted) setLoading(false);
+      });
   }
 
   async function handleDelete(pdf) {

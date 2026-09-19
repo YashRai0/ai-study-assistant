@@ -127,6 +127,7 @@ export async function rankConcepts({ userId, courseId }) {
     return {
       concept, state, type, priority, mastery, misconception, overconfidence,
       prerequisiteReadiness, blockedByPrerequisite, prerequisite, reviewDue: Boolean(reviewDue),
+      urgency, importance,
     };
   }).sort((a, b) => b.priority - a.priority);
 
@@ -175,8 +176,11 @@ export async function getNextAction({ userId, courseId }) {
     retention,
     misconceptionRisk: best.misconception,
     prerequisiteBlocked: best.type === "PREREQUISITE_GAP",
+    prerequisiteName: best.type === "PREREQUISITE_GAP" && best.prerequisite?.concept?.name ? best.prerequisite.concept.name : null,
     dueForReview: best.reviewDue,
     recentFailureCount,
+    examImportance: best.importance,
+    examUrgency: best.urgency,
   });
 
   return {

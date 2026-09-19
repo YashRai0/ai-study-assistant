@@ -26,5 +26,7 @@ const attemptSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 attemptSchema.index({ user: 1, eventId: 1 }, { unique: true });
+attemptSchema.index({ user: 1, course: 1, conceptIds: 1, createdAt: -1 });
 
 export default mongoose.model("Attempt", attemptSchema);
+

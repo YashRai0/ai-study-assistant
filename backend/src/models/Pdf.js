@@ -17,6 +17,8 @@ const pdfSchema = new mongoose.Schema({
   fullText: { type: String, default: "" },
   pageCount: { type: Number, default: null }, // Set by uploadPdf worker
   chunkCount: { type: Number, default: 0 }, // avoids a Chunk count query just to show this on the Dashboard
+  cachedSummary: { type: String, default: null }, // Reusable document summary (Step 5)
+  compressedText: { type: String, default: null }, // Intermediate compression cache (Step 5)
   
   // BullMQ async processing (Phase 1)
   processingStatus: {

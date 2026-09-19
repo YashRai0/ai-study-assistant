@@ -22,4 +22,6 @@ const studyPlanSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+studyPlanSchema.index({ owner: 1, createdAt: -1 });
+
 export default mongoose.model("StudyPlan", studyPlanSchema);

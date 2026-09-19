@@ -27,7 +27,10 @@ router.post("/:pdfId", aiLimiter, validate(flashcardsSchema), async (req, res) =
   if (!doc) return res.status(404).json({ error: "PDF not found." });
 
   try {
-    const raw = await generateFlashcards(doc.fullText, count || 15);
+    const raw = await generateFlashcards(doc.fullText, count || 15, {
+      contentHash: doc.contentHash,
+      compressedText: doc.compressedText,
+    });
     const parsed = extractAndValidateJson(raw, flashcardsResultSchema, { arrayBracket: true });
 
     if (!parsed.success) {

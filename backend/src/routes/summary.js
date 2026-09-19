@@ -18,8 +18,18 @@ router.post("/:pdfId", validate(summarySchema), async (req, res) => {
   const doc = await Pdf.findOne({ _id: req.params.pdfId, owner: req.user.id });
   if (!doc) return res.status(404).json({ error: "PDF not found." });
 
+  if (style === "bullets" && doc.cachedSummary) {
+    return res.json({ summary: doc.cachedSummary });
+  }
+
   try {
-    const summary = await generateSummary(doc.fullText, style);
+    const summary = await generateSummary(doc.fullText, style, {
+      contentHash: doc.contentHash,
+      compressedText: doc.compressedText,
+    });
+    if (style === "bullets" && !doc.cachedSummary) {
+      await Pdf.findByIdAndUpdate(doc._id, { cachedSummary: summary });
+    }
     res.json({ summary });
   } catch (err) {
     logger.error({ reqId: req.id, err }, "Summary error");

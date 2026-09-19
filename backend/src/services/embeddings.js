@@ -23,14 +23,32 @@ export async function embedText(text) {
 }
 
 /**
- * Embeds an array of text chunks sequentially.
- * (Sequential keeps memory bounded for a student-project-sized deployment;
- * batch it if you need more throughput later.)
+ * Embeds an array of text chunks with controlled, bounded concurrency (Step 7).
+ * Keeps memory bounded while dramatically improving throughput compared to
+ * strictly sequential processing.
  */
-export async function embedChunks(chunks) {
-  const embeddings = [];
-  for (const chunk of chunks) {
-    embeddings.push(await embedText(chunk));
+export async function embedChunks(
+  chunks,
+  {
+    concurrency = Number(process.env.EMBEDDING_CONCURRENCY) || 4,
+    batchSize = Number(process.env.EMBEDDING_BATCH_SIZE) || 8,
+  } = {}
+) {
+  if (!chunks || !chunks.length) return [];
+
+  const results = new Array(chunks.length);
+  const boundedConcurrency = Math.max(1, Math.min(concurrency, chunks.length));
+
+  // Process through bounded worker pool to prevent unlimited parallel promises
+  let cursor = 0;
+  async function worker() {
+    while (cursor < chunks.length) {
+      const idx = cursor++;
+      results[idx] = await embedText(chunks[idx]);
+    }
   }
-  return embeddings;
+
+  const workers = Array.from({ length: boundedConcurrency }, () => worker());
+  await Promise.all(workers);
+  return results;
 }

@@ -24,51 +24,57 @@ import { processLearningEvent } from "./processLearningEvent.js";
  * Can be run in-process within the HTTP server (default for single-instance/free hosting)
  * or in a standalone worker process (npm run worker).
  */
+function getQueueConcurrency(queueName, defaultConcurrency) {
+  const envKey = `WORKER_CONCURRENCY_${queueName.toUpperCase()}`;
+  const envVal = Number(process.env[envKey]);
+  return Number.isFinite(envVal) && envVal > 0 ? envVal : defaultConcurrency;
+}
+
 export function startWorkers() {
   const workers = [
     new Worker("uploadPdf", withJobHardening("uploadPdf", processPdfUpload), {
       connection: getRedis(),
-      concurrency: 2,
+      concurrency: getQueueConcurrency("uploadPdf", 2),
     }),
     new Worker("uploadDocx", withJobHardening("uploadDocx", processDocxUpload), {
       connection: getRedis(),
-      concurrency: 2,
+      concurrency: getQueueConcurrency("uploadDocx", 2),
     }),
     new Worker("uploadPptx", withJobHardening("uploadPptx", processPptxUpload), {
       connection: getRedis(),
-      concurrency: 2,
+      concurrency: getQueueConcurrency("uploadPptx", 2),
     }),
     new Worker("ingestYoutube", withJobHardening("ingestYoutube", processYoutubeIngest), {
       connection: getRedis(),
-      concurrency: 2,
+      concurrency: getQueueConcurrency("ingestYoutube", 2),
     }),
     new Worker("uploadAudio", withJobHardening("uploadAudio", processAudioUpload), {
       connection: getRedis(),
-      concurrency: 2,
+      concurrency: getQueueConcurrency("uploadAudio", 2),
     }),
 
     new Worker("embedChunks", withJobHardening("embedChunks", processEmbedChunks), {
       connection: getRedis(),
-      concurrency: 1,
+      concurrency: getQueueConcurrency("embedChunks", 1),
     }),
 
     new Worker("ocr", withJobHardening("ocr", processOcr), {
       connection: getRedis(),
-      concurrency: 1,
+      concurrency: getQueueConcurrency("ocr", 1),
     }),
 
     new Worker("synthesis", withJobHardening("synthesis", processSynthesis), {
       connection: getRedis(),
-      concurrency: 2,
+      concurrency: getQueueConcurrency("synthesis", 2),
     }),
 
     new Worker("learning", withJobHardening("learning", processLearning), {
       connection: getRedis(),
-      concurrency: 1,
+      concurrency: getQueueConcurrency("learning", 1),
     }),
     new Worker("learningEvent", withJobHardening("learningEvent", processLearningEvent), {
       connection: getRedis(),
-      concurrency: 4,
+      concurrency: getQueueConcurrency("learningEvent", 4),
     }),
   ];
 

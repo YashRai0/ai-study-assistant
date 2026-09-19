@@ -19,4 +19,8 @@ const flashcardSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+flashcardSchema.index({ owner: 1, nextReviewDate: 1 });
+flashcardSchema.index({ owner: 1, pdf: 1, createdAt: 1 });
+flashcardSchema.index({ owner: 1, subject: 1, nextReviewDate: 1 });
+
 export default mongoose.model("Flashcard", flashcardSchema);

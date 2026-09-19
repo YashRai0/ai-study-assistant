@@ -29,5 +29,7 @@ const chunkSchema = new mongoose.Schema({
 
 chunkSchema.index({ owner: 1, subject: 1 });
 chunkSchema.index({ pdf: 1, contentHash: 1 });
+chunkSchema.index({ pdf: 1, owner: 1 });
 
 export default mongoose.model("Chunk", chunkSchema);
+

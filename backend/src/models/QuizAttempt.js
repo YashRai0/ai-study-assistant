@@ -14,4 +14,7 @@ const quizAttemptSchema = new mongoose.Schema({
   takenAt: { type: Date, default: Date.now, index: true },
 });
 
+quizAttemptSchema.index({ owner: 1, takenAt: -1 });
+quizAttemptSchema.index({ owner: 1, pdf: 1, takenAt: -1 });
+
 export default mongoose.model("QuizAttempt", quizAttemptSchema);

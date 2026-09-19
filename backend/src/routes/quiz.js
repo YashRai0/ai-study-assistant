@@ -28,7 +28,10 @@ router.post("/:pdfId", validate(quizSchema), async (req, res) => {
   if (!doc) return res.status(404).json({ error: "PDF not found." });
 
   try {
-    const raw = await generateQuiz(doc.fullText, { mcq, trueFalse, shortAnswer });
+    const raw = await generateQuiz(doc.fullText, { mcq, trueFalse, shortAnswer }, {
+      contentHash: doc.contentHash,
+      compressedText: doc.compressedText,
+    });
     const parsed = extractAndValidateJson(raw, quizResultSchema, { arrayBracket: false });
 
     if (!parsed.success) {

@@ -17,17 +17,27 @@ import { retentionFraction } from "./masteryWithEbbinghaus.js";
 
 const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
 
-export function readinessForConcept(concept, state, misconception, now = Date.now()) {
+export function readinessForConcept(concept, state, misconception, stateByConcept = null, now = Date.now()) {
+  let time = now;
+  let stateMap = stateByConcept;
+  if (typeof stateByConcept === "number" || stateByConcept instanceof Date) {
+    time = stateByConcept;
+    stateMap = (typeof now === "object" && now !== null && !(now instanceof Date)) ? now : null;
+  }
+
   const mastery = clamp(state?.mastery);
   const confidence = clamp(state?.confidence ?? 0.5);
   const prerequisiteReadiness = clamp(
     (concept.prerequisites || []).reduce((acc, id) => {
-      const s = state?.prerequisiteStates?.find?.((x) => String(x.concept) === String(id));
+      const key = String(id?._id || id);
+      const s = stateMap instanceof Map
+        ? stateMap.get(key)
+        : (stateMap ? stateMap[key] : null);
       return Math.min(acc, clamp(s?.mastery ?? 0));
     }, 1)
   );
   const last = state?.lastReviewedAt ? new Date(state.lastReviewedAt).getTime() : 0;
-  const ageDays = last ? Math.max(0, (now - last) / 864e5) : 30;
+  const ageDays = last ? Math.max(0, (time - last) / 864e5) : 30;
   // Always recompute from mastery + elapsed time rather than reading
   // state.retention directly. That stored field is set once, at review
   // time, to roughly "mastery as of this review" (see mastery.js's
@@ -79,7 +89,7 @@ export async function getAdaptiveCourseState({ userId, courseId }) {
       confidence: clamp(state?.confidence ?? 0.5),
       calibration: state?.calibration ?? 0,
       calibrationLabel: calibrationLabel(state?.calibration ?? 0, state?.attempts ?? 0),
-      readiness: readinessForConcept(concept, state, misconceptionByConcept.get(String(concept._id))),
+      readiness: readinessForConcept(concept, state, misconceptionByConcept.get(String(concept._id)), stateByConcept),
       misconception: misconceptionByConcept.get(String(concept._id)) || null,
     };
   });

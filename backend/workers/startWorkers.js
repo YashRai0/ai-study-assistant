@@ -24,58 +24,53 @@ import { processLearningEvent } from "./processLearningEvent.js";
  * Can be run in-process within the HTTP server (default for single-instance/free hosting)
  * or in a standalone worker process (npm run worker).
  */
+/**
+ * Worker timing configurations to minimize idle Redis/Upstash command overhead.
+ *
+ * BullMQ Worker defaults drainDelay to 5s and stalledInterval to 30s.
+ * Across 10 workers on serverless Redis like Upstash, those defaults generate
+ * ~10-20 commands/sec (~1.3 million commands/day) purely on empty queues.
+ *
+ * - drainDelay: 30s (increases BZPOPMIN timeout from 5s to 30s, cutting idle polling by 83%).
+ *   When a job is added to the queue, BullMQ pushes a marker that awakens BZPOPMIN immediately,
+ *   so active jobs experience zero latency.
+ * - stalledInterval: 300,000ms (5 minutes, reducing stalled check EVALSHA/EXISTS by 90%).
+ *   Lock renewal for running jobs continues every 15s regardless of this setting.
+ */
+export const WORKER_DRAIN_DELAY = Number(process.env.WORKER_DRAIN_DELAY) || 30; // seconds
+export const WORKER_STALLED_INTERVAL = Number(process.env.WORKER_STALLED_INTERVAL) || 5 * 60 * 1000; // 300,000 ms (5 min)
+
 function getQueueConcurrency(queueName, defaultConcurrency) {
   const envKey = `WORKER_CONCURRENCY_${queueName.toUpperCase()}`;
   const envVal = Number(process.env[envKey]);
   return Number.isFinite(envVal) && envVal > 0 ? envVal : defaultConcurrency;
 }
 
+function createWorkerOptions(queueName, defaultConcurrency) {
+  return {
+    connection: getRedis(),
+    concurrency: getQueueConcurrency(queueName, defaultConcurrency),
+    drainDelay: WORKER_DRAIN_DELAY,
+    stalledInterval: WORKER_STALLED_INTERVAL,
+  };
+}
+
 export function startWorkers() {
   const workers = [
-    new Worker("uploadPdf", withJobHardening("uploadPdf", processPdfUpload), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("uploadPdf", 2),
-    }),
-    new Worker("uploadDocx", withJobHardening("uploadDocx", processDocxUpload), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("uploadDocx", 2),
-    }),
-    new Worker("uploadPptx", withJobHardening("uploadPptx", processPptxUpload), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("uploadPptx", 2),
-    }),
-    new Worker("ingestYoutube", withJobHardening("ingestYoutube", processYoutubeIngest), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("ingestYoutube", 2),
-    }),
-    new Worker("uploadAudio", withJobHardening("uploadAudio", processAudioUpload), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("uploadAudio", 2),
-    }),
+    new Worker("uploadPdf", withJobHardening("uploadPdf", processPdfUpload), createWorkerOptions("uploadPdf", 2)),
+    new Worker("uploadDocx", withJobHardening("uploadDocx", processDocxUpload), createWorkerOptions("uploadDocx", 2)),
+    new Worker("uploadPptx", withJobHardening("uploadPptx", processPptxUpload), createWorkerOptions("uploadPptx", 2)),
+    new Worker("ingestYoutube", withJobHardening("ingestYoutube", processYoutubeIngest), createWorkerOptions("ingestYoutube", 2)),
+    new Worker("uploadAudio", withJobHardening("uploadAudio", processAudioUpload), createWorkerOptions("uploadAudio", 2)),
 
-    new Worker("embedChunks", withJobHardening("embedChunks", processEmbedChunks), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("embedChunks", 1),
-    }),
+    new Worker("embedChunks", withJobHardening("embedChunks", processEmbedChunks), createWorkerOptions("embedChunks", 1)),
 
-    new Worker("ocr", withJobHardening("ocr", processOcr), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("ocr", 1),
-    }),
+    new Worker("ocr", withJobHardening("ocr", processOcr), createWorkerOptions("ocr", 1)),
 
-    new Worker("synthesis", withJobHardening("synthesis", processSynthesis), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("synthesis", 2),
-    }),
+    new Worker("synthesis", withJobHardening("synthesis", processSynthesis), createWorkerOptions("synthesis", 2)),
 
-    new Worker("learning", withJobHardening("learning", processLearning), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("learning", 1),
-    }),
-    new Worker("learningEvent", withJobHardening("learningEvent", processLearningEvent), {
-      connection: getRedis(),
-      concurrency: getQueueConcurrency("learningEvent", 4),
-    }),
+    new Worker("learning", withJobHardening("learning", processLearning), createWorkerOptions("learning", 1)),
+    new Worker("learningEvent", withJobHardening("learningEvent", processLearningEvent), createWorkerOptions("learningEvent", 4)),
   ];
 
   workers.forEach((worker) => {

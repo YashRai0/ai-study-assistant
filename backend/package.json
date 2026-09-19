@@ -11,7 +11,7 @@
     "worker:watch": "node --watch workers/index.js",
     "test": "node --experimental-test-module-mocks --test \"test/**/*.test.js\"",
     "test:integration": "node --experimental-test-module-mocks --test \"test/integration/**/*.test.js\"",
-    "test:unit": "node --test \"test/*.test.js\"",
+    "test:unit": "node --experimental-test-module-mocks --test \"test/*.test.js\"",
     "preflight": "node scripts/preflight.mjs"
   },
   "dependencies": {

@@ -34,7 +34,7 @@ mock.module("../src/services/redis.js", {
   },
 });
 
-const { startWorkers } = await import("../workers/startWorkers.js");
+const { startWorkers, WORKER_DRAIN_DELAY, WORKER_STALLED_INTERVAL } = await import("../workers/startWorkers.js");
 
 const EXPECTED_QUEUES = [
   "uploadPdf",
@@ -56,6 +56,25 @@ test("startWorkers creates all 10 expected BullMQ workers with proper configurat
   const names = workers.map((w) => w.name);
   for (const expected of EXPECTED_QUEUES) {
     assert.ok(names.includes(expected), `Missing worker for queue ${expected}`);
+  }
+});
+
+test("workers have explicit drainDelay (30s) and stalledInterval (5m) to minimize idle Redis overhead", () => {
+  assert.equal(WORKER_DRAIN_DELAY, 30);
+  assert.equal(WORKER_STALLED_INTERVAL, 300000);
+
+  const workers = startWorkers();
+  for (const worker of workers) {
+    assert.equal(
+      worker.opts?.drainDelay,
+      30,
+      `Worker ${worker.name} must have drainDelay set to 30`
+    );
+    assert.equal(
+      worker.opts?.stalledInterval,
+      300000,
+      `Worker ${worker.name} must have stalledInterval set to 300000 (5 minutes)`
+    );
   }
 });
 

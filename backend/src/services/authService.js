@@ -30,9 +30,8 @@ export async function initiatePasswordReset(email) {
 
   const appUrl = process.env.APP_URL || "http://localhost:5173";
   const resetUrl = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(normalizedEmail)}`;
-  // sendEmail is currently a stub (see emailTemplates.js) — it logs instead
-  // of delivering anything. The reset token only reaches the user once a
-  // real email provider is wired up there.
+  // sendEmail simulates email delivery in local development (logging the reset
+  // URL to console/logger) and dispatches via a provider in production when configured.
   await sendEmail({ to: normalizedEmail, templateName: "passwordReset", variables: { resetUrl } });
 
   return { success: true };

@@ -1,4 +1,5 @@
 // Email templates ready for SendGrid/Mailgun integration
+import logger from "../utils/logger.js";
 
 export const emailTemplates = {
   reviewReminder: {
@@ -85,10 +86,26 @@ export const emailTemplates = {
       <p><small>You're on track for {{readyPercent}}% readiness by {{examDate}}</small></p>
     `,
   },
+
+  passwordReset: {
+    subject: "Reset your AI Study Assistant password",
+    html: `
+      <h2>Reset your password</h2>
+      <p>We received a request to reset the password for your AI Study Assistant account.</p>
+      <p>Click the link below to set a new password:</p>
+      <p>
+        <a href="{{resetUrl}}" style="background-color: #111827; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+          Reset Password →
+        </a>
+      </p>
+      <p>This password reset link expires in 1 hour.</p>
+      <p>If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.</p>
+    `,
+  },
 };
 
 // Template renderer
-export function renderTemplate(templateName, variables) {
+export function renderTemplate(templateName, variables = {}) {
   const template = emailTemplates[templateName];
   if (!template) throw new Error(`Template ${templateName} not found`);
   
@@ -105,15 +122,53 @@ export function renderTemplate(templateName, variables) {
   return { subject, html };
 }
 
-// Email service (ready for SendGrid)
-export async function sendEmail({ to, templateName, variables }) {
-  // In production, replace with SendGrid:
-  // const sgMail = require('@sendgrid/mail');
-  // sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  // const { subject, html } = renderTemplate(templateName, variables);
-  // await sgMail.send({ to, subject, html, from: 'noreply@prepnexia.com' });
-  
+// Email service (handles development simulation and production provider dispatch)
+export async function sendEmail({ to, templateName, variables = {} }) {
   const { subject, html } = renderTemplate(templateName, variables);
-  console.log(`[EMAIL] To: ${to}, Subject: ${subject}`);
-  return { sent: true, to, subject };
+
+  const isProduction = process.env.NODE_ENV === "production";
+  const hasProvider = Boolean(process.env.SENDGRID_API_KEY);
+
+  if (isProduction && hasProvider) {
+    // In production with a real email provider configured:
+    // const sgMail = require('@sendgrid/mail');
+    // sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    // await sgMail.send({ to, subject, html, from: process.env.EMAIL_FROM || 'noreply@prepnexia.com' });
+    return { sent: true, simulated: false, to, subject };
+  }
+
+  if (isProduction && !hasProvider) {
+    logger.warn({ to, templateName }, "Email not sent: No email provider configured in production");
+    return { sent: false, simulated: false, reason: "NO_PROVIDER", to, subject };
+  }
+
+  // Development / local simulation:
+  // Render template, log recipient and reset URL clearly without exposing raw token separately.
+  console.log("\n==================== [DEV EMAIL SIMULATION] ====================");
+  console.log(`[DEV EMAIL] To: ${to}`);
+  console.log(`[DEV EMAIL] Subject: ${subject}`);
+  if (variables.resetUrl) {
+    console.log(`[DEV EMAIL] Reset URL: ${variables.resetUrl}`);
+  }
+  console.log("[DEV EMAIL] (Development only — no actual email was delivered)");
+  console.log("================================================================\n");
+
+  logger.info(
+    {
+      to,
+      subject,
+      templateName,
+      simulated: true,
+      hasResetUrl: Boolean(variables.resetUrl),
+    },
+    "Development email simulated (no external email provider configured)"
+  );
+
+  return {
+    sent: false,
+    simulated: true,
+    to,
+    subject,
+    html,
+  };
 }

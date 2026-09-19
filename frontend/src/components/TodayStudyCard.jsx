@@ -51,6 +51,7 @@ export default function TodayStudyCard({ courseId, courseTitle }) {
   const [action, setAction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [showWhy, setShowWhy] = useState(false);
 
   useEffect(() => {
     if (!courseId) return;
@@ -119,6 +120,30 @@ export default function TodayStudyCard({ courseId, courseTitle }) {
                 />
               </div>
               <span className="text-xs font-semibold text-ink-500">{masteryPct}% Mastered</span>
+            </div>
+          )}
+
+          {action.explanation?.reasons?.length > 0 && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowWhy((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-600 hover:text-ink-900 transition"
+                aria-expanded={showWhy}
+              >
+                <span>Why this is recommended</span>
+                <span className="text-[10px] text-ink-400" aria-hidden="true">{showWhy ? "▲" : "▼"}</span>
+              </button>
+              {showWhy && (
+                <ul className="mt-2 space-y-1.5 rounded-xl border border-ink-100 bg-white/90 p-3 text-xs text-ink-600 shadow-sm">
+                  {action.explanation.reasons.map((reason, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-ink-400 font-bold leading-relaxed">•</span>
+                      <span className="leading-relaxed">{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </div>

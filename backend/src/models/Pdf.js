@@ -19,6 +19,7 @@ const pdfSchema = new mongoose.Schema({
   chunkCount: { type: Number, default: 0 }, // avoids a Chunk count query just to show this on the Dashboard
   cachedSummary: { type: String, default: null }, // Reusable document summary (Step 5)
   compressedText: { type: String, default: null }, // Intermediate compression cache (Step 5)
+  activeQuiz: { type: mongoose.Schema.Types.Mixed, default: null }, // Authoritative generated quiz key for server-side scoring
   
   // BullMQ async processing (Phase 1)
   processingStatus: {

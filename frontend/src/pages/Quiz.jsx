@@ -49,7 +49,7 @@ export default function Quiz() {
     // whether this save succeeds, so a failure here shouldn't block anything
     // — it just means this attempt won't show up in the analytics dashboard.
     try {
-      await client.post(`/quiz/${pdfId}/attempts`, { score, total: outOf });
+      await client.post(`/quiz/${pdfId}/attempts`, { answers, score, total: outOf });
     } catch {
       // silently ignore — see comment above
     }

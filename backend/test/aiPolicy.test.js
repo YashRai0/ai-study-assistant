@@ -16,6 +16,7 @@ test("aiPolicy: defines policies for all primary AI operations", () => {
     "rerank",
     "misconception_risk",
     "compression_segment",
+    "study_plan",
   ];
 
   for (const op of expectedOperations) {

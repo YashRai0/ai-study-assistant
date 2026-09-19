@@ -1,6 +1,6 @@
 import Groq, { toFile } from "groq-sdk";
 import { getTaskPolicy } from "./aiPolicy.js";
-import { getCachedAiResponse, setCachedAiResponse, buildCacheKey, hashInput } from "./aiCache.js";
+import { getCachedAiResponse, setCachedAiResponse, buildCacheKey, buildRerankCacheKey, hashInput } from "./aiCache.js";
 import { recordAiRequest, recordRateLimitRetry } from "./aiMetrics.js";
 import logger from "../utils/logger.js";
 
@@ -297,8 +297,26 @@ export async function streamAnswerFromNotes(question, contextChunks, onToken, si
 
 /** Explain-like-I'm-a-beginner mode. */
 export async function explainSimply(topic, contextChunks) {
+  const policy = getTaskPolicy("simple_explanation");
+  const contextFingerprint = (contextChunks || [])
+    .map((c) => `${c.page || 0}:${(c.text || "").slice(0, 80)}`)
+    .join("|");
+  const inputHash = hashInput({ topic: topic.trim().toLowerCase(), context: contextFingerprint });
+  const cacheKey = buildCacheKey({
+    operation: "simple_explanation",
+    model: policy.model,
+    reasoningEffort: policy.reasoningEffort,
+    promptVersion: policy.promptVersion,
+    inputHash,
+  });
+
+  const cached = await getCachedAiResponse(cacheKey, "simple_explanation");
+  if (cached) return cached;
+
   const { system, user } = buildExplainSimplyPrompt(topic, contextChunks);
-  return complete(system, user, { operation: "simple_explanation" });
+  const result = await complete(system, user, { operation: "simple_explanation" });
+  await setCachedAiResponse(cacheKey, result, policy.ttlSeconds, "simple_explanation");
+  return result;
 }
 
 /** Streaming variant of explainSimply. */
@@ -459,7 +477,7 @@ Respond ONLY as JSON, no other text, no markdown code fences, in this exact shap
   ]
 }`;
   const user = `Notes context:\n${context}`;
-  return complete(system, user, { jsonMode: true });
+  return complete(system, user, { operation: "study_plan", jsonMode: true });
 }
 
 /**
@@ -514,6 +532,22 @@ Respond ONLY as JSON:
  * Generates diagnostic questions designed to distinguish weak concepts.
  */
 export async function generateDiagnosticQuestions(fullText, concepts, { count = 8, misconceptionPatterns = [] } = {}) {
+  const policy = getTaskPolicy("diagnostic_generation");
+  const conceptNames = (concepts || []).map((c) => c.name).sort().join(",");
+  const textHash = hashInput(fullText);
+  const patternNames = (misconceptionPatterns || []).map((p) => p.pattern).sort().join(",");
+  const inputHash = hashInput({ textHash, concepts: conceptNames, count, patterns: patternNames });
+  const cacheKey = buildCacheKey({
+    operation: "diagnostic_generation",
+    model: policy.model,
+    reasoningEffort: policy.reasoningEffort,
+    promptVersion: policy.promptVersion,
+    inputHash,
+  });
+
+  const cached = await getCachedAiResponse(cacheKey, "diagnostic_generation");
+  if (cached && Array.isArray(cached)) return cached;
+
   const workingText = await compressIfLong(fullText);
   const conceptList = concepts.map((c) => c.name).join(", ");
   const misconceptionSection = misconceptionPatterns.length
@@ -542,6 +576,7 @@ Respond ONLY as JSON:
   const raw = await complete(system, workingText, { operation: "diagnostic_generation", jsonMode: true });
   const parsed = extractJsonObject(raw);
   if (!parsed?.questions || !Array.isArray(parsed.questions)) throw new Error("Invalid diagnostic question output");
+  await setCachedAiResponse(cacheKey, parsed.questions, policy.ttlSeconds, "diagnostic_generation");
   return parsed.questions;
 }
 
@@ -593,6 +628,21 @@ export async function rerankByRelevance(query, candidates, { topK = null } = {})
   if (!candidates.length) return [];
   // Restrict candidate pool to at most 10 chunks (Step 9)
   const pool = candidates.slice(0, 10);
+  const policy = getTaskPolicy("rerank");
+  const cacheKey = buildRerankCacheKey({
+    query,
+    candidates: pool,
+    model: policy.model,
+    reasoningEffort: policy.reasoningEffort,
+    promptVersion: policy.promptVersion,
+  });
+
+  const cached = await getCachedAiResponse(cacheKey, "rerank");
+  if (cached && Array.isArray(cached)) {
+    const reranked = applyRelevanceScores(pool, cached);
+    return topK ? reranked.slice(0, topK) : reranked;
+  }
+
   const numbered = pool.map((c, i) => `[${i}] ${String(c.text || "").slice(0, 800)}`).join("\n\n");
   const system = `You are a precise relevance-ranking assistant.
 ${UNTRUSTED_CONTENT_GUARD}
@@ -606,6 +656,7 @@ index from 0 to ${pool.length - 1} exactly once.`;
   const parsed = extractJsonObject(raw);
   if (!parsed?.scores || !Array.isArray(parsed.scores)) throw new Error("Invalid rerank output");
 
+  await setCachedAiResponse(cacheKey, parsed.scores, policy.ttlSeconds, "rerank");
   const reranked = applyRelevanceScores(pool, parsed.scores);
   return topK ? reranked.slice(0, topK) : reranked;
 }

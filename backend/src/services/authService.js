@@ -55,6 +55,7 @@ export async function resetPassword(email, resetToken, newPassword) {
   await user.setPassword(newPassword);
   user.resetTokenHash = null;
   user.resetExpires = null;
+  user.tokenRevokedAt = new Date();
   await user.save();
 
   return { success: true };

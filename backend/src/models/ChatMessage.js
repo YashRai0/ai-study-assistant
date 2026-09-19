@@ -18,6 +18,11 @@ const chatMessageSchema = new mongoose.Schema({
     enum: ["HIGH", "MEDIUM", "LOW"],
     default: "HIGH",
   },
+  status: {
+    type: String,
+    enum: ["complete", "interrupted", "error"],
+    default: "complete",
+  },
   ts: { type: Date, default: Date.now },
 });
 

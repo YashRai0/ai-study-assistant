@@ -70,9 +70,38 @@ export async function setCachedAiResponse(key, value, ttlSeconds = DEFAULT_TTL_S
   }
 }
 
+export function buildRerankCacheKey({
+  query,
+  candidates = [],
+  model,
+  reasoningEffort,
+  promptVersion = "rerank:v1",
+  retrievalVersion = "v1",
+}) {
+  const normalizedQuery = (query || "").trim().toLowerCase();
+  // Bounded fingerprint per candidate (index + ID + short content hash)
+  const candidateFingerprints = (candidates || []).map((c, i) => {
+    const id = c.id || c._id || "";
+    const textSample = (c.text || "").slice(0, 100).trim();
+    const snippetHash = crypto.createHash("sha256").update(textSample).digest("hex").slice(0, 12);
+    return `${i}:${id}:${snippetHash}`;
+  });
+  const poolHash = crypto.createHash("sha256").update(candidateFingerprints.join("|")).digest("hex");
+  const inputHash = crypto.createHash("sha256").update(`${normalizedQuery}::${poolHash}::${retrievalVersion}`).digest("hex");
+
+  return buildCacheKey({
+    operation: "rerank",
+    model,
+    reasoningEffort,
+    promptVersion,
+    inputHash,
+  });
+}
+
 /**
  * Invalidates all cached AI artifacts derived from a specific document content hash.
  * Used when a PDF or document source is updated or deleted (Step 5).
+ * Uses cursor-based SCAN instead of blocking KEYS in production.
  */
 export async function invalidateDocumentAiArtifacts(documentHash) {
   if (!documentHash) return 0;
@@ -81,13 +110,22 @@ export async function invalidateDocumentAiArtifacts(documentHash) {
     if (!redis) return 0;
 
     const pattern = `ai:v1:*:*:*:*:${documentHash}*`;
-    const keys = await redis.keys(pattern);
-    if (keys && keys.length > 0) {
-      await redis.del(...keys);
-      logger.info({ count: keys.length, documentHash }, "Invalidated AI response cache for document");
-      return keys.length;
+    let cursor = "0";
+    let deletedCount = 0;
+
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+      cursor = nextCursor;
+      if (keys && keys.length > 0) {
+        await redis.del(...keys);
+        deletedCount += keys.length;
+      }
+    } while (cursor !== "0");
+
+    if (deletedCount > 0) {
+      logger.info({ count: deletedCount, documentHash }, "Invalidated AI response cache for document via SCAN");
     }
-    return 0;
+    return deletedCount;
   } catch (err) {
     logger.warn({ err: err.message, documentHash }, "Failed to invalidate document AI cache");
     return 0;

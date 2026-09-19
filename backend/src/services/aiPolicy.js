@@ -124,6 +124,15 @@ export const AI_TASK_POLICY = Object.freeze({
     cacheable: true,
     ttlSeconds: 86400 * 7, // 7 days for document segment intermediate compression
   },
+  study_plan: {
+    model: DEFAULT_MODEL,
+    reasoningEffort: "medium",
+    maxTokens: 2500,
+    temperature: 0.3,
+    promptVersion: "study_plan:v1",
+    jsonMode: true,
+    cacheable: false, // highly personalized by student's exam dates and weak subjects
+  },
 });
 
 /**

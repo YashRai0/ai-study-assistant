@@ -129,8 +129,11 @@ router.post("/reset-password", authLimiter, validate(resetPasswordSchema), async
 router.post("/refresh", authLimiter, validate(refreshTokenSchema), async (req, res) => {
   try {
     const decoded = authService.verifyRefreshToken(req.body.refreshToken);
-    const user = await User.findById(decoded.sub);
+    const user = await User.findById(decoded.sub).select("+tokenRevokedAt");
     if (!user) return res.status(401).json({ error: "Invalid refresh token." });
+    if (user.tokenRevokedAt && decoded.iat && decoded.iat * 1000 < user.tokenRevokedAt.getTime()) {
+      return res.status(401).json({ error: "Invalid or expired refresh token." });
+    }
     const tokens = authService.generateTokens(user);
     res.json(tokens);
   } catch {

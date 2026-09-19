@@ -37,7 +37,10 @@ export async function embedChunks(
   if (!chunks || !chunks.length) return [];
 
   const results = new Array(chunks.length);
-  const boundedConcurrency = Math.max(1, Math.min(concurrency, chunks.length));
+  // Bounded worker pool concurrency. If concurrency is not explicitly set but batchSize is,
+  // use batchSize to govern bounded concurrency.
+  const poolLimit = concurrency || batchSize || 4;
+  const boundedConcurrency = Math.max(1, Math.min(poolLimit, chunks.length));
 
   // Process through bounded worker pool to prevent unlimited parallel promises
   let cursor = 0;

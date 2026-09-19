@@ -88,25 +88,60 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
       if (!res.writableEnded) controller.abort();
     });
 
-    const sendToken = (token) => res.write(`data: ${JSON.stringify({ token })}\n\n`);
+    let accumulated = "";
+    const sendToken = (token) => {
+      accumulated += token;
+      if (!res.writableEnded && !controller.signal.aborted) {
+        res.write(`data: ${JSON.stringify({ token })}\n\n`);
+      }
+    };
 
     // Emit initial metadata event with confidence and sources
     res.write(`data: ${JSON.stringify({ meta: { confidence, sources } })}\n\n`);
 
-    let fullAnswer;
-    if (mode !== "explain" && confidence === "LOW") {
-      fullAnswer = "I couldn't find this information in your uploaded notes.";
-      sendToken(fullAnswer);
-    } else if (mode === "explain") {
-      fullAnswer = await streamExplainSimply(message, topChunks, sendToken, controller.signal);
-    } else {
-      fullAnswer = await streamAnswerFromNotes(message, topChunks, sendToken, controller.signal);
+    let fullAnswer = "";
+    let isAborted = false;
+    try {
+      if (mode !== "explain" && confidence === "LOW") {
+        fullAnswer = "I couldn't find this information in your uploaded notes.";
+        sendToken(fullAnswer);
+      } else if (mode === "explain") {
+        const streamResult = await streamExplainSimply(message, topChunks, sendToken, controller.signal);
+        fullAnswer = streamResult || accumulated;
+      } else {
+        const streamResult = await streamAnswerFromNotes(message, topChunks, sendToken, controller.signal);
+        fullAnswer = streamResult || accumulated;
+      }
+    } catch (streamErr) {
+      if (controller.signal.aborted || streamErr?.name === "AbortError") {
+        isAborted = true;
+        fullAnswer = accumulated;
+      } else {
+        throw streamErr;
+      }
     }
 
-    if (controller.signal.aborted) return;
+    if (controller.signal.aborted || isAborted) {
+      const partialTrimmed = (fullAnswer || accumulated || "").trim();
+      await ChatMessage.create({ pdf: pdfId, owner: req.user.id, role: "user", content: message });
+      if (partialTrimmed.length > 0) {
+        await ChatMessage.create({
+          pdf: pdfId,
+          owner: req.user.id,
+          role: "assistant",
+          content: partialTrimmed,
+          sources,
+          confidence,
+          status: "interrupted",
+        });
+      }
+      return;
+    }
 
-    res.write(`data: ${JSON.stringify({ done: true, confidence, sources })}\n\n`);
-    res.end();
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ done: true, confidence, sources })}\n\n`);
+      res.end();
+    }
 
     await ChatMessage.create({ pdf: pdfId, owner: req.user.id, role: "user", content: message });
     await ChatMessage.create({
@@ -116,15 +151,14 @@ router.post("/:pdfId", validate(chatMessageSchema), async (req, res) => {
       content: fullAnswer,
       sources,
       confidence,
+      status: "complete",
     });
   } catch (err) {
     logger.error({ reqId: req.id, err }, "Chat error");
     if (!res.headersSent) {
-      res.status(500).json({ error: "Couldn'''t generate an answer right now. Please try again." });
+      res.status(500).json({ error: "Couldn't generate an answer right now. Please try again." });
     } else {
-      res.write(`data: ${JSON.stringify({ error: "Something went wrong while generating the answer." })}
-
-`);
+      res.write(`data: ${JSON.stringify({ error: "Something went wrong while generating the answer." })}\n\n`);
       res.end();
     }
   }

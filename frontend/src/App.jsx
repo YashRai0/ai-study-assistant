@@ -6,6 +6,8 @@ import About from "./pages/About.jsx";
 import Privacy from "./pages/Privacy.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Search from "./pages/Search.jsx";
 import MultiChat from "./pages/MultiChat.jsx";
@@ -38,6 +40,8 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
         <Route path="/chat-all" element={<ProtectedRoute><MultiChat /></ProtectedRoute>} />

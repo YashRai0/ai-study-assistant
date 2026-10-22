@@ -7,6 +7,7 @@ export default function ExamReadiness({ courseId }) {
 
   useEffect(() => {
     if (!courseId) return;
+    setLoading(true);
     client
       .get(`/learning/courses/${courseId}/readiness`)
       .then(({ data }) => setReadiness(data.readiness))
@@ -14,58 +15,110 @@ export default function ExamReadiness({ courseId }) {
       .finally(() => setLoading(false));
   }, [courseId]);
 
-  if (loading) return <p className="text-ink-400">Calculating readiness…</p>;
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col justify-between rounded-2xl border border-ink-100 bg-white p-6 shadow-sm animate-pulse">
+        <div className="h-4 w-28 rounded bg-ink-100" />
+        <div className="mx-auto my-6 h-32 w-32 rounded-full bg-ink-100" />
+        <div className="h-3 w-40 rounded bg-ink-100" />
+      </div>
+    );
+  }
+
   if (!readiness) return null;
 
-  const getColorClass = (percent) => {
-    if (percent >= 80) return "text-green-600";
-    if (percent >= 60) return "text-amber-600";
-    return "text-red-600";
+  const pct = Math.max(0, Math.min(100, readiness.readyPercent || 0));
+  // Circle geometry for SVG gauge (radius = 48)
+  const radius = 48;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+
+  const getGradientColors = (percent) => {
+    if (percent >= 80) return { start: "#10b981", end: "#059669", text: "text-emerald-600" };
+    if (percent >= 60) return { start: "#f59e0b", end: "#d97706", text: "text-amber-600" };
+    return { start: "#6366f1", end: "#4f46e5", text: "text-indigo-600" };
   };
 
-  const getBgClass = (percent) => {
-    if (percent >= 80) return "bg-green-50 border-green-200";
-    if (percent >= 60) return "bg-amber-50 border-amber-200";
-    return "bg-red-50 border-red-200";
-  };
+  const colors = getGradientColors(pct);
 
   return (
-    <div className={`rounded-2xl border-2 p-6 ${getBgClass(readiness.readyPercent)}`}>
-      <div className="flex items-start justify-between">
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-ink-100 bg-gradient-to-b from-white via-paper/40 to-white p-6 shadow-sm transition hover:shadow-md">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-ink-600">Exam Readiness</p>
-          <p className={`text-4xl font-bold ${getColorClass(readiness.readyPercent)}`}>
-            {readiness.readyPercent}%
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-400">Target Readiness</span>
+          <h3 className="font-display text-base font-bold text-ink-900">Exam Preparedness</h3>
+        </div>
+        {readiness.daysUntilExam !== null && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-ink-100 bg-ink-50/80 px-2.5 py-1 text-xs font-semibold text-ink-700">
+            <span>📅</span>
+            <span>{readiness.daysUntilExam}d left</span>
+          </span>
+        )}
+      </div>
+
+      {/* Radial Gauge */}
+      <div className="my-4 flex items-center justify-center">
+        <div className="relative flex items-center justify-center">
+          <svg className="h-36 w-36 -rotate-90 transform" viewBox="0 0 120 120">
+            <defs>
+              <linearGradient id={`radial-grad-${courseId}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={colors.start} />
+                <stop offset="100%" stopColor={colors.end} />
+              </linearGradient>
+            </defs>
+            {/* Background Track */}
+            <circle
+              cx="60"
+              cy="60"
+              r={radius}
+              stroke="currentColor"
+              strokeWidth="9"
+              className="text-ink-100"
+              fill="transparent"
+            />
+            {/* Animated Gauge Ring */}
+            <circle
+              cx="60"
+              cy="60"
+              r={radius}
+              stroke={`url(#radial-grad-${courseId})`}
+              strokeWidth="9"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              fill="transparent"
+              style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1)" }}
+            />
+          </svg>
+
+          {/* Central Percentage */}
+          <div className="absolute flex flex-col items-center justify-center text-center">
+            <span className="font-display text-3xl font-extrabold tracking-tight text-ink-900">
+              {pct}%
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ink-400">
+              Score
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Summary Stats */}
+      <div className="space-y-2 border-t border-ink-100/70 pt-3 text-xs">
+        <div className="flex items-center justify-between font-medium text-ink-600">
+          <span>Mastered concepts:</span>
+          <span className="font-bold text-ink-900">{readiness.conceptsReady} of {readiness.conceptsTotal}</span>
+        </div>
+        <div className="flex items-center justify-between font-medium text-ink-600">
+          <span>Attempted coverage:</span>
+          <span className="font-bold text-ink-900">{readiness.coveragePercent}%</span>
+        </div>
+        {readiness.message && (
+          <p className="pt-1 text-[11px] leading-relaxed text-ink-500 line-clamp-2">
+            {readiness.message}
           </p>
-          <p className="mt-1 text-sm text-ink-600">{readiness.message}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-semibold text-ink-900">{readiness.conceptsReady}/{readiness.conceptsTotal}</p>
-          <p className="text-xs text-ink-600">Concepts mastered</p>
-          {readiness.daysUntilExam !== null && (
-            <>
-              <p className="mt-3 text-sm font-semibold text-ink-900">{readiness.daysUntilExam}</p>
-              <p className="text-xs text-ink-600">Days left</p>
-            </>
-          )}
-        </div>
+        )}
       </div>
-      <div className="mt-4 h-2 w-full rounded-full bg-ink-200">
-        <div
-          className={`h-full rounded-full transition-all ${
-            readiness.readyPercent >= 80
-              ? "bg-green-500"
-              : readiness.readyPercent >= 60
-              ? "bg-amber-500"
-              : "bg-red-500"
-          }`}
-          style={{ width: `${readiness.readyPercent}%` }}
-        />
-      </div>
-      <p className="mt-3 text-xs text-ink-600">
-        Based on <span className="font-semibold">{readiness.coveragePercent}%</span> concept coverage
-        ({readiness.conceptsAttempted}/{readiness.conceptsTotal} concepts attempted at least once)
-      </p>
     </div>
   );
 }

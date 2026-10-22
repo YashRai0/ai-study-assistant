@@ -4,6 +4,7 @@ import client from "../api/client.js";
 import { streamChatRequest } from "../api/streamChat.js";
 import VoiceInput from "../components/VoiceInput.jsx";
 import StudyFlowNav from "../components/StudyFlowNav.jsx";
+import CitationDrawer from "../components/CitationDrawer.jsx";
 import { speak, speechSupported } from "../utils/speech.js";
 
 const SUGGESTIONS = [
@@ -21,6 +22,7 @@ export default function Chat() {
   const [actionError, setActionError] = useState("");
   const [readAloud, setReadAloud] = useState(false);
   const [explainMode, setExplainMode] = useState(false);
+  const [activeCitation, setActiveCitation] = useState(null);
   const bottomRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -145,8 +147,8 @@ export default function Chat() {
           return (
             <div
               key={i}
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 ${
-                m.role === "user" ? "ml-auto bg-ink-900 text-paper" : "bg-white/80 text-ink-900"
+              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 shadow-2xs ${
+                m.role === "user" ? "ml-auto bg-ink-900 text-paper" : "bg-white/90 text-ink-900 border border-ink-100/70"
               }`}
             >
               <div>{m.content || (isStreamingPlaceholder ? "Thinking…" : "")}</div>
@@ -171,13 +173,16 @@ export default function Chat() {
                     </span>
                   )}
                   {m.sources?.map((s, idx) => (
-                    <span
+                    <button
                       key={idx}
-                      title={s.excerpt || `From page ${s.page} of ${s.filename}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-ink-100 bg-paper/80 px-2 py-0.5 text-ink-600 hover:bg-white hover:text-ink-900 cursor-help"
+                      type="button"
+                      onClick={() => setActiveCitation(s)}
+                      className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-paper/90 px-2 py-0.5 text-ink-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-900 transition shadow-2xs cursor-pointer"
+                      title="Click to view verified source chunk quote"
                     >
-                      📚 Page {s.page} {s.score ? `(${s.score}%)` : ""}
-                    </span>
+                      <span>📚 Page {s.page}</span>
+                      {s.score && <span className="text-[10px] text-ink-400 font-normal">({s.score}%)</span>}
+                    </button>
                   ))}
                 </div>
               )}
@@ -230,6 +235,14 @@ export default function Chat() {
           {sending ? "Stop" : "Send"}
         </button>
       </form>
+
+      {/* Interactive Citation Inspection Modal */}
+      {activeCitation && (
+        <CitationDrawer
+          citation={activeCitation}
+          onClose={() => setActiveCitation(null)}
+        />
+      )}
     </main>
   );
 }

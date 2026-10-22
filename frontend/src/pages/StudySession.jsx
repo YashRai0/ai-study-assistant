@@ -1,17 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import client from "../api/client.js";
 
 const PHASE_LABELS = {
   warmup: "Warm-up",
-  teach: "Learn",
-  practice: "Practice",
-  misconception_fix: "Fix a misconception",
-  recall: "Final recall",
+  teach: "Core Concept",
+  practice: "Active Practice",
+  misconception_fix: "Repair Misconception",
+  recall: "Spaced Recall",
 };
+
+const CONFIDENCE_LEVELS = [
+  { val: 1, label: "Guessing" },
+  { val: 2, label: "Unsure" },
+  { val: 3, label: "Moderate" },
+  { val: 4, label: "Confident" },
+  { val: 5, label: "Mastered" },
+];
 
 function makeEventId(seed) {
   return `${crypto.randomUUID ? crypto.randomUUID() : Date.now()}-${seed}`;
+}
+
+function formatTimer(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export default function StudySession() {
@@ -31,6 +45,11 @@ export default function StudySession() {
   const [finished, setFinished] = useState(false);
   const [masteryAfter, setMasteryAfter] = useState({});
 
+  // Pomodoro Timer States
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const timerRef = useRef(null);
+
   useEffect(() => {
     if (!courseId) return;
     client
@@ -42,6 +61,29 @@ export default function StudySession() {
   }, [courseId]);
 
   const phase = plan?.phases?.[phaseIndex] || null;
+  const phaseTotalSeconds = (phase?.minutes || 5) * 60;
+
+  // Initialize timer when phase changes
+  useEffect(() => {
+    if (phase) {
+      setSecondsLeft((phase.minutes || 5) * 60);
+      setIsPaused(false);
+    }
+  }, [phaseIndex, phase?.conceptId]);
+
+  // Timer Tick
+  useEffect(() => {
+    if (isPaused || secondsLeft <= 0 || finished) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+
+    timerRef.current = setInterval(() => {
+      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timerRef.current);
+  }, [isPaused, secondsLeft, finished]);
 
   useEffect(() => {
     if (!phase) return;
@@ -96,14 +138,21 @@ export default function StudySession() {
   if (!courseId) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <p className="text-ink-500">Pick a course to start a session.</p>
-        <Link to="/study" className="mt-4 inline-block rounded-full bg-ink-900 px-5 py-2 text-paper">Back to dashboard</Link>
+        <p className="text-ink-500">Pick a course to start a focused study session.</p>
+        <Link to="/study" className="mt-4 inline-block rounded-full bg-ink-900 px-5 py-2 text-xs font-semibold text-paper">
+          Back to Courses
+        </Link>
       </main>
     );
   }
 
   if (loading) {
-    return <main className="mx-auto max-w-2xl px-6 py-16 text-center text-ink-400">Building your session…</main>;
+    return (
+      <main className="mx-auto max-w-2xl px-6 py-16 text-center">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+        <p className="mt-3 text-sm text-ink-400">Synthesizing personalized session phases…</p>
+      </main>
+    );
   }
 
   if (!plan?.phases?.length) {
@@ -112,106 +161,283 @@ export default function StudySession() {
         <p className="text-ink-500">
           {error || "There's nothing to study yet — upload notes and wait for them to finish processing first."}
         </p>
-        <Link to="/study" className="mt-4 inline-block rounded-full bg-ink-900 px-5 py-2 text-paper">Back to dashboard</Link>
+        <Link to="/study" className="mt-4 inline-block rounded-full bg-ink-900 px-5 py-2 text-xs font-semibold text-paper">
+          Back to Courses
+        </Link>
       </main>
     );
   }
 
+  // Completion Screen
   if (finished) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-16">
-        <h1 className="font-display text-3xl font-semibold text-ink-900">Session complete 🎉</h1>
-        <p className="mt-2 text-ink-600">You spent about {plan.totalMinutes} minutes on {plan.course.title}.</p>
-        <ul className="mt-6 space-y-3">
-          {[...new Map(plan.phases.map((p) => [p.conceptId, p])).values()].map((p) => {
-            const after = masteryAfter[p.conceptId];
-            return (
-              <li key={p.conceptId} className="rounded-xl border border-ink-100 bg-white p-4">
-                <p className="font-medium text-ink-900">{p.conceptName}</p>
-                <p className="text-sm text-ink-500">
-                  {Math.round(p.masteryBefore * 100)}%
-                  {after !== undefined ? ` → ${Math.round(after * 100)}%` : ""}
-                </p>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-8 flex gap-3">
-          <Link to="/study" className="rounded-full bg-ink-900 px-5 py-2 text-paper">Back to dashboard</Link>
-          <button
-            onClick={() => { window.location.href = `/study-session?course=${courseId}&minutes=${minutes}`; }}
-            className="rounded-full border border-ink-900 px-5 py-2 text-ink-900"
-          >
-            Another session
-          </button>
+      <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+        <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 via-white to-white p-8 text-center shadow-md">
+          <span className="text-5xl">🎉</span>
+          <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-ink-900">
+            Session Completed!
+          </h1>
+          <p className="mt-1 text-sm text-ink-600">
+            You completed a <strong className="text-ink-900">{plan.totalMinutes}-minute</strong> focused study block on{" "}
+            <strong className="text-indigo-700">{plan.course.title}</strong>.
+          </p>
+
+          <div className="mt-8 space-y-3 text-left">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-ink-400 block px-1">
+              Mastery Growth Summary
+            </span>
+            {[...new Map(plan.phases.map((p) => [p.conceptId, p])).values()].map((p) => {
+              const beforePct = Math.round(p.masteryBefore * 100);
+              const after = masteryAfter[p.conceptId];
+              const afterPct = after !== undefined ? Math.round(after * 100) : beforePct;
+              const delta = afterPct - beforePct;
+
+              return (
+                <div
+                  key={p.conceptId}
+                  className="flex items-center justify-between rounded-2xl border border-ink-100 bg-white p-4 shadow-2xs"
+                >
+                  <div>
+                    <p className="font-semibold text-ink-900 text-sm">{p.conceptName}</p>
+                    <p className="text-xs text-ink-500 mt-0.5">
+                      {beforePct}% {after !== undefined ? `→ ${afterPct}%` : ""}
+                    </p>
+                  </div>
+                  {delta > 0 ? (
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                      +{delta}% Mastery
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-600">
+                      Reinforced
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              to="/dashboard"
+              className="rounded-full bg-ink-900 px-6 py-2.5 text-xs font-semibold text-paper shadow-xs hover:bg-ink-800 transition"
+            >
+              Return to Dashboard
+            </Link>
+            <button
+              onClick={() => {
+                window.location.href = `/study-session?course=${courseId}&minutes=${minutes}`;
+              }}
+              className="rounded-full border border-ink-200 bg-white px-6 py-2.5 text-xs font-semibold text-ink-700 hover:bg-ink-50 transition shadow-2xs"
+            >
+              Start Another Session ↻
+            </button>
+          </div>
         </div>
       </main>
     );
   }
 
+  const timePct = phaseTotalSeconds > 0 ? Math.round((secondsLeft / phaseTotalSeconds) * 100) : 0;
+
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <div className="flex items-center justify-between text-sm text-ink-400">
-        <span>Step {phaseIndex + 1} of {plan.phases.length}</span>
-        <span>{plan.totalMinutes}-minute session</span>
-      </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
-        <div className="h-full rounded-full bg-highlight" style={{ width: `${((phaseIndex + 1) / plan.phases.length) * 100}%` }} />
-      </div>
-
-      <p className="mt-6 text-xs font-medium uppercase tracking-wide text-ink-400">
-        {PHASE_LABELS[phase.phase] || phase.phase} · about {phase.minutes} min
-      </p>
-      <h1 className="mt-1 font-display text-2xl font-semibold text-ink-900">{phase.conceptName}</h1>
-
-      {!question ? (
-        <div className="mt-8">
-          <p className="text-ink-400">{error || "Loading a question…"}</p>
-          {error && (
-            <button onClick={advance} className="mt-4 rounded-full bg-ink-900 px-5 py-2 text-paper">Skip this step</button>
-          )}
-        </div>
-      ) : (
-        <section className="mt-6 rounded-2xl border border-ink-100 bg-white p-6">
-          {question.cognitiveLevel && (
-            <span className="rounded-full bg-ink-100 px-2 py-0.5 text-xs capitalize text-ink-600">{question.cognitiveLevel}</span>
-          )}
-          <h2 className="mt-3 text-lg font-semibold text-ink-900">{question.question}</h2>
-          {question.type === "mcq" ? (
-            <div className="mt-5 grid gap-2">
-              {question.options.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setAnswer(option)}
-                  className={`rounded-xl border p-3 text-left ${answer === option ? "border-ink-900" : "border-ink-100"}`}
-                >
-                  {option}
-                </button>
-              ))}
+    <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 space-y-6">
+      {/* Top Pomodoro HUD Header */}
+      <div className="rounded-2xl border border-ink-100 bg-white/90 p-4 shadow-sm backdrop-blur-md">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+              Focus Pomodoro HUD
+            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-sm font-bold text-ink-900">
+                Phase {phaseIndex + 1} of {plan.phases.length}:
+              </span>
+              <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
+                {PHASE_LABELS[phase.phase] || phase.phase}
+              </span>
             </div>
-          ) : (
-            <textarea
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              className="mt-5 min-h-32 w-full rounded-xl border border-ink-100 p-3"
-              placeholder="Explain your answer…"
-            />
-          )}
-          <div className="mt-5 flex items-center gap-3">
-            <label className="text-sm">Confidence</label>
-            <select value={confidence} onChange={(e) => setConfidence(Number(e.target.value))} className="rounded-lg border p-2">
-              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}/5</option>)}
-            </select>
           </div>
-          <div className="mt-6 flex gap-3">
-            <button disabled={!answer || submitting} onClick={submit} className="rounded-full bg-ink-900 px-5 py-2 text-paper disabled:opacity-40">
-              {submitting ? "Recording…" : phaseIndex + 1 < plan.phases.length ? "Submit & continue" : "Submit & finish"}
-            </button>
-            <button onClick={() => navigate("/study")} className="text-sm text-ink-400">Exit session</button>
+
+          {/* Circular Countdown Timer */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="relative flex h-11 w-11 items-center justify-center">
+                <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+                  <path
+                    className="text-ink-100"
+                    strokeWidth="3.5"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className="text-indigo-600 transition-all duration-1000 ease-linear"
+                    strokeDasharray={`${timePct}, 100`}
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <span className="absolute font-mono text-[10px] font-bold text-ink-900">
+                  {formatTimer(secondsLeft)}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPaused((p) => !p)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-ink-200 bg-ink-50/70 text-xs text-ink-700 hover:bg-ink-100 transition shadow-2xs"
+                title={isPaused ? "Resume timer" : "Pause timer"}
+              >
+                {isPaused ? "▶" : "⏸"}
+              </button>
+            </div>
           </div>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        </section>
-      )}
+        </div>
+
+        {/* Phase Pipeline Pills */}
+        <div className="mt-3.5 flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-ink-100/70 text-xs">
+          {plan.phases.map((p, idx) => {
+            const isCurrent = idx === phaseIndex;
+            const isCompleted = idx < phaseIndex;
+
+            let pillClass = "border border-ink-200 bg-white text-ink-400";
+            if (isCurrent) {
+              pillClass = "border-indigo-600 bg-indigo-50 font-bold text-indigo-900 shadow-2xs";
+            } else if (isCompleted) {
+              pillClass = "border-emerald-200 bg-emerald-50 font-medium text-emerald-800";
+            }
+
+            return (
+              <div
+                key={idx}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition ${pillClass}`}
+              >
+                <span>{isCompleted ? "✓" : `${idx + 1}.`}</span>
+                <span>{PHASE_LABELS[p.phase] || p.phase}</span>
+                <span className="opacity-60">({p.minutes}m)</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Study Card */}
+      <div className="space-y-4">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-ink-400">Target Concept</span>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink-900">{phase.conceptName}</h1>
+        </div>
+
+        {!question ? (
+          <div className="rounded-2xl border border-ink-100 bg-white p-8 text-center space-y-3">
+            <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+            <p className="text-xs text-ink-400">{error || "Calibrating pedagogical question…"}</p>
+            {error && (
+              <button
+                onClick={advance}
+                className="mt-3 rounded-full bg-ink-900 px-5 py-2 text-xs font-semibold text-paper"
+              >
+                Skip this step →
+              </button>
+            )}
+          </div>
+        ) : (
+          <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm space-y-5">
+            <div className="flex items-center gap-2">
+              {question.cognitiveLevel && (
+                <span className="rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 text-[10px] font-bold uppercase text-indigo-700">
+                  {question.cognitiveLevel}
+                </span>
+              )}
+              {question.difficulty && (
+                <span className="text-[11px] font-medium text-ink-400">
+                  Difficulty Level: {question.difficulty}/5
+                </span>
+              )}
+            </div>
+
+            <h2 className="text-base font-bold text-ink-900 leading-relaxed">{question.question}</h2>
+
+            {/* Response Area */}
+            {question.type === "mcq" ? (
+              <div className="grid gap-2.5 pt-1">
+                {question.options.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setAnswer(option)}
+                    className={`flex items-center justify-between rounded-xl border p-3.5 text-left text-xs transition-all ${
+                      answer === option
+                        ? "border-indigo-600 bg-indigo-50/70 font-semibold text-indigo-950 ring-2 ring-indigo-500/20"
+                        : "border-ink-200 bg-white text-ink-800 hover:border-ink-300 hover:bg-ink-50/50"
+                    }`}
+                  >
+                    <span>{option}</span>
+                    {answer === option && <span className="text-indigo-600 font-bold">●</span>}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <textarea
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                rows={4}
+                className="w-full rounded-xl border border-ink-200 p-3.5 text-xs text-ink-900 placeholder:text-ink-400 focus:border-indigo-600 focus:outline-hidden"
+                placeholder="Explain your reasoning or conceptual step-by-step answer…"
+              />
+            )}
+
+            {/* Metacognitive Confidence Selector */}
+            <div className="space-y-1.5 pt-2 border-t border-ink-100/70">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                Self-Reported Confidence
+              </span>
+              <div className="grid grid-cols-5 gap-1.5">
+                {CONFIDENCE_LEVELS.map(({ val, label }) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setConfidence(val)}
+                    className={`rounded-xl border py-2 px-1 text-center transition ${
+                      confidence === val
+                        ? "border-indigo-600 bg-indigo-50 font-bold text-indigo-950 ring-2 ring-indigo-500/20"
+                        : "border-ink-200 bg-white text-ink-600 hover:bg-ink-50"
+                    }`}
+                  >
+                    <span className="text-xs font-bold block">{val}</span>
+                    <span className="text-[9px] truncate block opacity-70">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex items-center justify-between pt-3 border-t border-ink-100">
+              <button
+                type="button"
+                onClick={() => navigate("/study")}
+                className="text-xs text-ink-400 hover:text-ink-700 transition"
+              >
+                Exit session
+              </button>
+
+              <button
+                disabled={!answer || submitting}
+                onClick={submit}
+                className="inline-flex items-center gap-1.5 rounded-full bg-ink-900 px-6 py-2.5 text-xs font-bold text-paper shadow-xs hover:bg-ink-800 transition disabled:opacity-40"
+              >
+                <span>{submitting ? "Submitting…" : phaseIndex + 1 < plan.phases.length ? "Submit & Continue →" : "Finish Session 🎉"}</span>
+              </button>
+            </div>
+
+            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+          </section>
+        )}
+      </div>
     </main>
   );
 }

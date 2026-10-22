@@ -4,13 +4,15 @@ import { streamChatRequest } from "../api/streamChat.js";
 import VoiceInput from "../components/VoiceInput.jsx";
 import CitationDrawer from "../components/CitationDrawer.jsx";
 import { speak, speechSupported } from "../utils/speech.js";
+import Badge from "../components/ui/Badge.jsx";
+import Button from "../components/ui/Button.jsx";
 
 const ALL_SCOPE = "All subjects";
 
 const SUGGESTIONS = [
   "What are the recurring themes across my notes?",
   "How do the concepts in my different documents connect?",
-  "Give me a study guide covering everything I've uploaded",
+  "Give me a high-yield study guide covering all uploaded materials",
 ];
 
 export default function MultiChat() {
@@ -26,7 +28,7 @@ export default function MultiChat() {
   const abortControllerRef = useRef(null);
 
   useEffect(() => {
-    client.get("/search/subjects").then(({ data }) => setSubjects(data.subjects)).catch(() => setSubjects([]));
+    client.get("/search/subjects").then(({ data }) => setSubjects(data.subjects || [])).catch(() => setSubjects([]));
   }, []);
 
   useEffect(() => {
@@ -104,37 +106,60 @@ export default function MultiChat() {
   }
 
   async function clearChat() {
+    if (!window.confirm("Clear this multi-document conversation history?")) return;
     await client.delete("/multi-chat/history", { params: { scope } });
     setMessages([]);
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col px-6 py-8" style={{ minHeight: "calc(100vh - 72px)" }}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <main className="mx-auto flex max-w-4xl flex-col px-4 py-8 sm:px-6 lg:px-8" style={{ minHeight: "calc(100vh - 72px)" }}>
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-ink-100 dark:border-[#273352] pb-5">
         <div>
-          <h1 className="font-display text-2xl font-bold text-ink-900">Chat across all your notes</h1>
-          <p className="text-xs text-ink-500">Cross-document synthesis querying every source in the active scope.</p>
+          <div className="flex items-center gap-2">
+            <Badge variant="indigo" size="sm" dot>
+              Cross-Document Synthesis
+            </Badge>
+            <span className="text-xs text-ink-400">Holistic Note Querying</span>
+          </div>
+          <h1 className="mt-1 font-display text-2xl font-bold text-ink-900 dark:text-ink-50 sm:text-3xl">
+            Global Knowledge Assistant
+          </h1>
+          <p className="text-xs text-ink-500 dark:text-ink-400">
+            Query across multiple textbooks, slides, and lectures simultaneously with verified citations.
+          </p>
         </div>
-        <button onClick={clearChat} className="self-start text-xs text-ink-400 hover:text-ink-900 sm:self-auto transition">
-          Clear chat
-        </button>
+
+        <div className="flex items-center gap-2">
+          {speechSupported() && (
+            <label className="flex items-center gap-2 rounded-lg border border-ink-200 dark:border-[#273352] bg-white dark:bg-[#1b233a] px-3 py-1.5 text-xs text-ink-600 dark:text-ink-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={readAloud}
+                onChange={(e) => setReadAloud(e.target.checked)}
+                className="h-3.5 w-3.5 rounded text-highlight"
+              />
+              <span>Read aloud</span>
+            </label>
+          )}
+          <button
+            onClick={clearChat}
+            className="rounded-lg border border-ink-200 dark:border-[#273352] bg-white dark:bg-[#1b233a] px-3 py-1.5 text-xs font-medium text-ink-600 dark:text-ink-300 hover:text-red-600 transition"
+          >
+            Clear History
+          </button>
+        </div>
       </div>
 
-      {speechSupported() && (
-        <label className="mt-2 flex items-center gap-2 text-xs text-ink-500">
-          <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} />
-          Read answers aloud
-        </label>
-      )}
-
       {/* Scope Filter Pills */}
-      <div className="mt-4 flex flex-wrap gap-1.5">
+      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-semibold text-ink-400 mr-1">Scope:</span>
         <button
           onClick={() => setScope(ALL_SCOPE)}
-          className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+          className={`rounded-full px-3.5 py-1 text-xs font-semibold transition ${
             scope === ALL_SCOPE
-              ? "bg-ink-900 text-paper shadow-2xs"
-              : "border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 shadow-2xs"
+              ? "bg-ink-900 text-paper dark:bg-highlight dark:text-ink-950 shadow-2xs"
+              : "border border-ink-200 dark:border-[#273352] bg-white dark:bg-[#1b233a] text-ink-600 dark:text-ink-300 hover:bg-ink-50"
           }`}
         >
           All subjects
@@ -143,10 +168,10 @@ export default function MultiChat() {
           <button
             key={s}
             onClick={() => setScope(s)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition ${
               scope === s
-                ? "bg-ink-900 text-paper shadow-2xs"
-                : "border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 shadow-2xs"
+                ? "bg-ink-900 text-paper dark:bg-highlight dark:text-ink-950 shadow-2xs"
+                : "border border-ink-200 dark:border-[#273352] bg-white dark:bg-[#1b233a] text-ink-600 dark:text-ink-300 hover:bg-ink-50"
             }`}
           >
             {s}
@@ -154,61 +179,76 @@ export default function MultiChat() {
         ))}
       </div>
 
-      {/* Chat Messages */}
-      <div className="mt-6 flex-1 space-y-4 overflow-y-auto">
+      {/* Chat Messages Timeline */}
+      <div className="mt-6 flex-1 space-y-4 overflow-y-auto pb-4">
         {messages.length === 0 && (
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => send(s)}
-                className="rounded-full border border-ink-200 bg-white px-4 py-2 text-xs font-medium text-ink-700 hover:border-indigo-400 hover:bg-indigo-50/50 shadow-2xs transition"
-              >
-                {s}
-              </button>
-            ))}
+          <div className="mt-12 text-center">
+            <span className="text-4xl">🌐</span>
+            <h2 className="mt-3 font-display text-lg font-bold text-ink-900 dark:text-ink-100">
+              Explore concepts across all your materials
+            </h2>
+            <p className="mt-1 text-xs text-ink-500 dark:text-ink-400 max-w-md mx-auto">
+              Ask broad questions to see how different subjects intersect, compare theories, or generate unified study guides.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  className="rounded-xl border border-ink-200 dark:border-[#273352] bg-white dark:bg-[#1b233a] px-4 py-2 text-xs font-medium text-ink-700 dark:text-ink-300 hover:border-highlight hover:bg-highlight/5 shadow-2xs transition"
+                >
+                  "{s}"
+                </button>
+              ))}
+            </div>
           </div>
         )}
+
         {messages.map((m, i) => {
           const isStreamingPlaceholder = sending && i === messages.length - 1 && m.role === "assistant";
           return (
             <div
               key={i}
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 shadow-2xs ${
-                m.role === "user" ? "ml-auto bg-ink-900 text-paper" : "bg-white/90 text-ink-900 border border-ink-100/70"
+              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-5 py-4 shadow-2xs transition ${
+                m.role === "user"
+                  ? "ml-auto bg-ink-900 text-paper dark:bg-highlight dark:text-ink-950"
+                  : "bg-white dark:bg-[#1b233a] text-ink-900 dark:text-ink-50 border border-ink-100 dark:border-[#273352]"
               }`}
             >
-              <div>{m.content || (isStreamingPlaceholder ? "Thinking…" : "")}</div>
+              <div className="leading-relaxed text-sm">
+                {m.content || (isStreamingPlaceholder ? (
+                  <span className="inline-flex items-center gap-2 text-xs font-medium text-ink-400">
+                    <span className="h-2 w-2 rounded-full bg-highlight animate-ping" />
+                    Synthesizing knowledge across notes…
+                  </span>
+                ) : "")}
+              </div>
+
               {m.role === "assistant" && !isStreamingPlaceholder && (m.sources?.length > 0 || m.confidence) && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-ink-100/70 pt-2 text-xs">
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-ink-100 dark:border-[#273352] pt-2.5 text-xs">
                   {m.confidence === "HIGH" && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <Badge variant="sage" size="sm" dot>
                       Verified in Notes
-                    </span>
+                    </Badge>
                   )}
                   {m.confidence === "MEDIUM" && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    <Badge variant="highlight" size="sm" dot>
                       Partial Match
-                    </span>
+                    </Badge>
                   )}
                   {m.confidence === "LOW" && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-ink-100 px-2 py-0.5 font-medium text-ink-600">
-                      <span className="h-1.5 w-1.5 rounded-full bg-ink-400" />
-                      General Knowledge
-                    </span>
+                    <Badge variant="default" size="sm" dot>
+                      General AI Knowledge
+                    </Badge>
                   )}
+
                   {m.sources?.map((s, idx) => (
                     <button
                       key={idx}
-                      type="button"
                       onClick={() => setActiveCitation(s)}
-                      className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-paper/90 px-2 py-0.5 text-ink-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-900 transition shadow-2xs cursor-pointer"
-                      title={s.filename ? `From ${s.filename}` : "Click to view verified source chunk quote"}
+                      className="rounded-md bg-ink-50 dark:bg-[#131a2c] px-2 py-0.5 text-2xs font-semibold text-ink-600 dark:text-ink-300 hover:underline border border-ink-200/50 dark:border-[#273352]"
                     >
-                      <span>📚 {s.filename ? `${s.filename.slice(0, 14)}…` : "Doc"} p.{s.page}</span>
-                      {s.score && <span className="text-[10px] text-ink-400 font-normal">({s.score}%)</span>}
+                      📄 {s.filename || "Doc"} {s.page ? `p. ${s.page}` : ""}
                     </button>
                   ))}
                 </div>
@@ -219,45 +259,62 @@ export default function MultiChat() {
         <div ref={bottomRef} />
       </div>
 
-      {voiceError && <p className="mt-2 text-sm text-red-600">{voiceError}</p>}
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-        className="mt-6 flex gap-2"
-      >
-        <VoiceInput
-          disabled={sending}
-          onTranscribed={(text) => {
-            setVoiceError("");
-            send(text);
-          }}
-          onError={setVoiceError}
-        />
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask something about ${scope === ALL_SCOPE ? "all your notes" : scope}, or tap 🎤…`}
-          className="flex-1 rounded-full border border-ink-100 bg-white px-5 py-3 outline-none focus:border-highlight"
-        />
-        <button
-          type={sending ? "button" : "submit"}
-          onClick={sending ? stopGenerating : undefined}
-          className="rounded-full bg-ink-900 px-6 py-3 text-paper"
-        >
-          {sending ? "Stop" : "Send"}
-        </button>
-      </form>
-
-      {/* Interactive Citation Inspection Modal */}
-      {activeCitation && (
-        <CitationDrawer
-          citation={activeCitation}
-          onClose={() => setActiveCitation(null)}
-        />
+      {/* Voice Error Display */}
+      {voiceError && (
+        <div className="mb-2 rounded-xl bg-red-50 dark:bg-red-950/40 p-2 text-center text-xs text-red-600 dark:text-red-300">
+          {voiceError}
+        </div>
       )}
+
+      {/* Chat Input Console */}
+      <div className="sticky bottom-0 bg-paper/90 dark:bg-ink-950/90 py-3 backdrop-blur-md">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
+          className="flex items-center gap-2 rounded-2xl border border-ink-200 dark:border-[#273352] bg-white dark:bg-[#1b233a] p-1.5 shadow-sm"
+        >
+          <VoiceInput
+            onTranscript={(t) => setInput((prev) => (prev ? `${prev} ${t}` : t))}
+            onError={(msg) => setVoiceError(msg)}
+          />
+
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={sending ? "Assistant is thinking…" : "Ask a question across all your notes…"}
+            disabled={sending}
+            className="flex-1 bg-transparent px-3 py-2 text-sm text-ink-900 dark:text-ink-50 outline-none placeholder:text-ink-400"
+          />
+
+          {sending ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={stopGenerating}
+            >
+              Stop ⏹
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={!input.trim()}
+            >
+              Send ↑
+            </Button>
+          )}
+        </form>
+      </div>
+
+      {/* Citation Detail Drawer */}
+      <CitationDrawer
+        citation={activeCitation}
+        onClose={() => setActiveCitation(null)}
+      />
     </main>
   );
 }

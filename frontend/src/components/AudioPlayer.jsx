@@ -187,13 +187,13 @@ export default function AudioPlayer({
   const progressPercent = calculatePlaybackPercentage(currentTime, duration);
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white p-5 shadow-sm sm:p-6">
+    <div className="overflow-hidden rounded-3xl border border-ink-100 dark:border-[#273352] bg-white dark:bg-[#1b233a] p-5 shadow-sm sm:p-6">
       {hasAudioSource && <audio ref={audioRef} src={src} preload="metadata" />}
 
       {/* Header Info */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300">
             {isPlaying ? (
               <span className="flex h-3 w-3 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
@@ -204,7 +204,7 @@ export default function AudioPlayer({
             )}
           </div>
           <div>
-            <h4 className="text-sm font-bold text-ink-900">{title}</h4>
+            <h4 className="text-sm font-bold text-ink-900 dark:text-ink-50">{title}</h4>
             <p className="text-xs text-ink-400">
               {hasAudioSource ? "High-Fidelity Audio Stream" : "Neural Speech Synthesizer"} · {formatAudioTime(currentTime)} / {formatAudioTime(duration)}
             </p>
@@ -212,14 +212,14 @@ export default function AudioPlayer({
         </div>
 
         {/* Speed Selector */}
-        <div className="flex items-center gap-1 rounded-xl border border-ink-100 bg-paper p-1 text-xs">
+        <div className="flex items-center gap-1 rounded-xl border border-ink-100 dark:border-[#273352] bg-paper dark:bg-[#131a2c] p-1 text-xs">
           {[0.75, 1, 1.25, 1.5, 2].map((rate) => (
             <button
               key={rate}
               type="button"
               onClick={() => handleRateChange(rate)}
               className={`rounded-lg px-2 py-0.5 font-semibold transition ${
-                playbackRate === rate ? "bg-ink-900 text-paper shadow-xs" : "text-ink-600 hover:text-ink-900"
+                playbackRate === rate ? "bg-ink-900 text-paper dark:bg-highlight dark:text-ink-950 shadow-xs" : "text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white"
               }`}
             >
               {rate}x

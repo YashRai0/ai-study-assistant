@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar.jsx";
+import CommandPalette from "./components/CommandPalette.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Landing from "./pages/Landing.jsx";
 import About from "./pages/About.jsx";
@@ -33,6 +34,7 @@ import MobileNav from "./components/MobileNav.jsx";
 export default function App() {
   return (
     <div className="min-h-screen bg-paper pb-16 md:pb-0">
+      <CommandPalette />
       <Navbar />
       <Routes>
         <Route path="/" element={<Landing />} />

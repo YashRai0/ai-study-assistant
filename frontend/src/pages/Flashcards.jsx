@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import client from "../api/client.js";
+import StudyFlowNav from "../components/StudyFlowNav.jsx";
 
 export default function Flashcards() {
   const { pdfId } = useParams();
@@ -45,8 +46,11 @@ export default function Flashcards() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12 text-center">
-      <h1 className="font-display text-2xl font-semibold text-ink-900">Flashcards</h1>
+    <main className="mx-auto max-w-2xl px-6 py-8 text-center">
+      <div className="flex justify-center sm:justify-start">
+        <StudyFlowNav pdfId={pdfId} current="flashcards" />
+      </div>
+      <h1 className="mt-6 font-display text-2xl font-semibold text-ink-900">Flashcards</h1>
       <p className="mt-2 text-sm text-ink-400">
         These are saved and scheduled for spaced-repetition review — check{" "}
         <Link to="/review" className="underline">Review</Link> to study due cards across all your notes.

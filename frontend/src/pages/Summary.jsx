@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import client from "../api/client.js";
+import StudyFlowNav from "../components/StudyFlowNav.jsx";
 
 const STYLES = [
   { id: "bullets", label: "Bullet points" },
@@ -30,8 +31,9 @@ export default function Summary() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="font-display text-2xl font-semibold text-ink-900">Summarize your notes</h1>
+    <main className="mx-auto max-w-3xl px-6 py-8">
+      <StudyFlowNav pdfId={pdfId} current="summary" />
+      <h1 className="mt-6 font-display text-2xl font-semibold text-ink-900">Summarize your notes</h1>
       <div className="mt-6 flex flex-wrap gap-2">
         {STYLES.map((s) => (
           <button

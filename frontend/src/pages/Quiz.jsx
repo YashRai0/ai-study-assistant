@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import client from "../api/client.js";
+import StudyFlowNav from "../components/StudyFlowNav.jsx";
 
 export default function Quiz() {
   const { pdfId } = useParams();
@@ -56,8 +57,9 @@ export default function Quiz() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="font-display text-2xl font-semibold text-ink-900">Quiz yourself</h1>
+    <main className="mx-auto max-w-3xl px-6 py-8">
+      <StudyFlowNav pdfId={pdfId} current="quiz" />
+      <h1 className="mt-6 font-display text-2xl font-semibold text-ink-900">Quiz yourself</h1>
 
       {!quiz ? (
         <button

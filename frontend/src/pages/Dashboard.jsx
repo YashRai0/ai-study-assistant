@@ -51,17 +51,18 @@ export default function Dashboard() {
   }, []);
 
   function loadPdfs(signal) {
+    const abortSignal = signal instanceof AbortSignal ? signal : undefined;
     setLoading(true);
     setLoadError("");
     client
-      .get("/upload", signal ? { signal } : {})
+      .get("/upload", abortSignal ? { signal: abortSignal } : {})
       .then(({ data }) => setPdfs(data.pdfs))
       .catch((err) => {
-        if (signal?.aborted) return;
+        if (abortSignal?.aborted) return;
         setLoadError(formatApiError(err, "Couldn't load your notes right now."));
       })
       .finally(() => {
-        if (!signal?.aborted) setLoading(false);
+        if (!abortSignal?.aborted) setLoading(false);
       });
   }
 
@@ -144,9 +145,9 @@ export default function Dashboard() {
       )}
 
       {loadError && (
-        <div className="mt-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
           <span>{loadError}</span>
-          <button onClick={loadPdfs} className="font-semibold text-red-800 underline hover:text-red-950">
+          <button onClick={() => loadPdfs()} className="font-semibold text-red-800 underline hover:text-red-950 dark:text-red-200 dark:hover:text-white">
             Try again
           </button>
         </div>
@@ -252,7 +253,7 @@ export default function Dashboard() {
             </div>
 
             {/* Bento Cell 4: Course Focus Actions (Col Span 8) */}
-            <div className="md:col-span-8 flex flex-col justify-between rounded-2xl border border-ink-100 bg-gradient-to-br from-white via-paper/50 to-indigo-50/30 p-6 shadow-sm">
+            <div className="md:col-span-8 flex flex-col justify-between rounded-2xl border border-ink-100 bg-gradient-to-br from-white via-paper/50 to-indigo-50/30 dark:from-[#1b233a] dark:via-[#161e33] dark:to-[#1d233e] dark:border-[#273352] p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-indigo-700">Adaptive Hub</span>

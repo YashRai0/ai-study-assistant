@@ -41,6 +41,15 @@ const STATIC_COMMANDS = [
     keywords: ["diagnostic", "test", "baseline", "exam", "quiz"],
   },
   {
+    id: "action-toggle-theme",
+    title: "Toggle Dark / Light Theme",
+    subtitle: "Switch between midnight ink and notebook light mode",
+    category: "Actions",
+    icon: "🌓",
+    action: () => window.dispatchEvent(new CustomEvent("toggle-theme")),
+    keywords: ["theme", "dark", "light", "mode", "color", "night"],
+  },
+  {
     id: "nav-dashboard",
     title: "Learning Studio Dashboard",
     subtitle: "Overview, next best action, and bento grid",

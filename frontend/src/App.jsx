@@ -33,7 +33,7 @@ import MobileNav from "./components/MobileNav.jsx";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-paper pb-16 md:pb-0">
+    <div className="min-h-screen bg-paper text-ink-900 transition-colors duration-200 dark:bg-ink-950 dark:text-ink-50 pb-16 md:pb-0">
       <CommandPalette />
       <Navbar />
       <Routes>

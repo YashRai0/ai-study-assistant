@@ -20,7 +20,7 @@ export default function StreakTracker({ courseId }) {
   const daysThisWeek = Math.min(7, Math.max(0, streak.studyDaysThisWeek || 0));
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/50 via-white to-orange-50/30 p-5 shadow-sm transition hover:shadow-md">
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/50 via-white to-orange-50/30 dark:from-[#251f15] dark:via-[#1b233a] dark:to-[#221b16] dark:border-amber-900/40 p-5 shadow-sm transition hover:shadow-md">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wider text-amber-800/80">Study Momentum</span>
         <span className="text-xl">🔥</span>

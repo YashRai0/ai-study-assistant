@@ -27,3 +27,246 @@
     transform: rotateY(180deg);
   }
 }
+
+/* ==========================================================================
+   Dark mode ambient base & surface overrides
+   ========================================================================== */
+.dark body {
+  background-color: #0e1320;
+  color: #f0f2f8;
+}
+
+.dark .bg-paper {
+  background-color: #131a2c !important;
+}
+
+.dark .bg-white {
+  background-color: #1b233a !important;
+  color: #f0f2f8;
+}
+
+.dark .bg-white\/60,
+.dark .bg-white\/70,
+.dark .bg-white\/80,
+.dark .bg-white\/90,
+.dark .bg-white\/95 {
+  background-color: rgba(27, 35, 58, 0.9) !important;
+  color: #f0f2f8;
+}
+
+/* Override light gradient cards in dark mode so text is never washed out */
+.dark [class*="from-white"],
+.dark [class*="via-white"],
+.dark [class*="to-white"],
+.dark [class*="via-paper"] {
+  background-image: none !important;
+  background-color: #1b233a !important;
+}
+
+.dark .border-ink-100 {
+  border-color: #273352 !important;
+}
+
+.dark .border-ink-200 {
+  border-color: #34436b !important;
+}
+
+.dark .text-ink-900 {
+  color: #f0f2f8 !important;
+}
+
+.dark .text-ink-800 {
+  color: #dde2ee !important;
+}
+
+.dark .text-ink-700 {
+  color: #c2cce0 !important;
+}
+
+.dark .text-ink-600 {
+  color: #9cb0d4 !important;
+}
+
+.dark .text-ink-500,
+.dark .text-ink-400 {
+  color: #7b90b8 !important;
+}
+
+.dark .bg-ink-50,
+.dark .bg-ink-100 {
+  background-color: #1f2842 !important;
+}
+
+/* Universal dark mode hover overrides so hovering never turns buttons/pills white */
+.dark [class*="hover:bg-ink-50"]:hover,
+.dark [class*="hover:bg-ink-100"]:hover,
+.dark [class*="hover:bg-paper"]:hover,
+.dark [class*="hover:bg-white"]:hover {
+  background-color: #273454 !important;
+  color: #f0f2f8 !important;
+}
+
+.dark [class*="hover:text-ink-900"]:hover,
+.dark [class*="hover:text-ink-800"]:hover {
+  color: #ffffff !important;
+}
+
+.dark .bg-ink-900 {
+  background-color: #242f4c !important;
+  color: #f0f2f8 !important;
+}
+
+/* Interactive form inputs in dark mode */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background-color: #182035 !important;
+  color: #f0f2f8 !important;
+  border-color: #2d3b5e !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6c7f9e !important;
+}
+
+/* Semantic Status Tints in Dark Mode (High Contrast & Legibility) */
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/40,
+.dark .bg-emerald-50\/50,
+.dark .bg-emerald-50\/60,
+.dark .bg-emerald-50\/70,
+.dark .bg-emerald-50\/80 {
+  background-color: rgba(6, 78, 59, 0.28) !important;
+  color: #a7f3d0 !important;
+}
+
+.dark .text-emerald-950,
+.dark .text-emerald-900,
+.dark .text-emerald-800 {
+  color: #6ee7b7 !important;
+}
+
+.dark .text-emerald-700,
+.dark .text-emerald-600 {
+  color: #34d399 !important;
+}
+
+.dark .border-emerald-100,
+.dark .border-emerald-200,
+.dark .border-emerald-300 {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+.dark .bg-amber-50,
+.dark .bg-amber-50\/30,
+.dark .bg-amber-50\/40,
+.dark .bg-amber-50\/50,
+.dark .bg-amber-50\/60 {
+  background-color: rgba(120, 53, 15, 0.28) !important;
+  color: #fde68a !important;
+}
+
+.dark .text-amber-950,
+.dark .text-amber-900,
+.dark .text-amber-800 {
+  color: #fcd34d !important;
+}
+
+.dark .text-amber-700,
+.dark .text-amber-600 {
+  color: #fbbf24 !important;
+}
+
+.dark .border-amber-100,
+.dark .border-amber-200,
+.dark .border-amber-300 {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+.dark .bg-indigo-50,
+.dark .bg-indigo-50\/30,
+.dark .bg-indigo-50\/40,
+.dark .bg-indigo-50\/50,
+.dark .bg-indigo-50\/60,
+.dark .bg-indigo-50\/70,
+.dark .bg-indigo-50\/80 {
+  background-color: rgba(49, 46, 129, 0.3) !important;
+  color: #c7d2fe !important;
+}
+
+.dark .text-indigo-950,
+.dark .text-indigo-900,
+.dark .text-indigo-800 {
+  color: #a5b4fc !important;
+}
+
+.dark .text-indigo-700,
+.dark .text-indigo-600 {
+  color: #818cf8 !important;
+}
+
+.dark .border-indigo-100,
+.dark .border-indigo-200,
+.dark .border-indigo-300 {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+
+.dark .bg-blue-50 {
+  background-color: rgba(30, 58, 138, 0.3) !important;
+  color: #bfdbfe !important;
+}
+
+.dark .text-blue-700 {
+  color: #93c5fd !important;
+}
+
+.dark .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+.dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.3) !important;
+  color: #fecaca !important;
+}
+
+.dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+
+.dark .border-red-200 {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+.dark .bg-purple-50 {
+  background-color: rgba(88, 28, 135, 0.3) !important;
+  color: #e9d5ff !important;
+}
+
+.dark .text-purple-700 {
+  color: #d8b4fe !important;
+}
+
+.dark .border-purple-200 {
+  border-color: rgba(168, 85, 247, 0.35) !important;
+}
+
+/* Highlight pill and button contrast in dark mode */
+.dark .bg-highlight\/10,
+.dark .bg-highlight\/20,
+.dark .bg-highlight\/30 {
+  background-color: rgba(245, 185, 66, 0.2) !important;
+  color: #fcd34d !important;
+}
+
+.dark .bg-highlight {
+  background-color: #f5b942 !important;
+  color: #0e1320 !important;
+}
+
+.dark .highlight-mark {
+  background: linear-gradient(120deg, rgba(245, 185, 66, 0.45) 0%, rgba(245, 185, 66, 0.45) 100%) !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 0.35em !important;
+  background-position: 0 88% !important;
+}

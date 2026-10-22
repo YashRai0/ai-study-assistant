@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../api/AuthContext.jsx";
+import { useTheme } from "../context/ThemeContext.jsx";
 
 const PRIMARY_LINKS = [
   { to: "/dashboard", label: "Dashboard" },
@@ -19,6 +20,7 @@ const SECONDARY_LINKS = [
 
 export default function Navbar() {
   const { email, logout } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -101,13 +103,13 @@ export default function Navbar() {
                 </button>
 
                 {moreOpen && (
-                  <div className="absolute left-0 mt-2 w-48 rounded-2xl border border-ink-100 bg-white p-1.5 shadow-lg ring-1 ring-black/5">
+                  <div className="absolute left-0 mt-2 w-48 rounded-2xl border border-ink-100 bg-white dark:bg-[#1b233a] dark:border-[#273352] p-1.5 shadow-lg ring-1 ring-black/5 z-50">
                     {SECONDARY_LINKS.map((link) => (
                       <Link
                         key={link.to}
                         to={link.to}
                         onClick={() => setMoreOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 transition hover:bg-ink-50 hover:text-ink-900"
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 dark:text-ink-200 transition hover:bg-ink-100/70 dark:hover:bg-[#273454] hover:text-ink-900 dark:hover:text-white"
                       >
                         <span>{link.icon}</span>
                         <span>{link.label}</span>
@@ -135,6 +137,17 @@ export default function Navbar() {
               <kbd className="rounded border border-ink-100 bg-paper px-1.5 py-0.5 font-mono text-[10px] text-ink-600 shadow-2xs">
                 {isMac ? "⌘K" : "Ctrl+K"}
               </kbd>
+            </button>
+
+            {/* Dark / Light Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-ink-100 bg-paper text-ink-600 transition hover:border-ink-300 hover:bg-white hover:text-ink-900 shadow-2xs"
+              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              {isDark ? "☀️" : "🌙"}
             </button>
 
             {/* Profile & Settings (Email intentionally omitted per privacy preferences) */}
@@ -167,7 +180,18 @@ export default function Navbar() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Dark / Light Theme Toggle (Available when logged out too) */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-ink-100 bg-paper text-ink-600 transition hover:border-ink-300 hover:bg-white hover:text-ink-900 shadow-2xs"
+              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              {isDark ? "☀️" : "🌙"}
+            </button>
+
             <Link to="/login" className="text-xs sm:text-sm font-semibold text-ink-700 hover:text-ink-900 transition">
               Log in
             </Link>
@@ -191,7 +215,7 @@ export default function Navbar() {
               setMenuOpen(false);
               openCommandPalette();
             }}
-            className="mb-4 flex w-full items-center justify-between rounded-xl border border-ink-100 bg-paper p-2.5 text-xs font-semibold text-ink-800"
+            className="mb-3 flex w-full items-center justify-between rounded-xl border border-ink-100 bg-paper p-2.5 text-xs font-semibold text-ink-800"
           >
             <span className="flex items-center gap-2">
               <span>🔍</span>
@@ -200,6 +224,21 @@ export default function Navbar() {
             <kbd className="rounded border border-ink-100 bg-white px-1.5 py-0.5 font-mono text-[10px] text-ink-600">
               {isMac ? "⌘K" : "Ctrl+K"}
             </kbd>
+          </button>
+
+          {/* Theme Toggle in Mobile Menu */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="mb-4 flex w-full items-center justify-between rounded-xl border border-ink-100 bg-paper p-2.5 text-xs font-semibold text-ink-800"
+          >
+            <span className="flex items-center gap-2">
+              <span>{isDark ? "☀️" : "🌙"}</span>
+              <span>Appearance</span>
+            </span>
+            <span className="rounded-md bg-white px-2 py-0.5 text-[10px] font-bold text-ink-700 uppercase">
+              {theme}
+            </span>
           </button>
 
           {/* Primary Nav Links */}

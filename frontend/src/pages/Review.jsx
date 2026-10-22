@@ -167,7 +167,7 @@ export default function Review() {
               <p className="mt-3 text-xs text-ink-400">Analyzing spaced review schedule…</p>
             </div>
           ) : !conceptQueue?.length ? (
-            <div className="rounded-3xl border border-dashed border-emerald-200 bg-emerald-50/40 p-8 text-center sm:p-12 shadow-xs">
+            <div className="rounded-3xl border border-dashed border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-800/40 p-8 text-center sm:p-12 shadow-xs">
               <span className="text-4xl">🎉</span>
               <h2 className="mt-3 font-display text-lg font-bold text-emerald-950">
                 You're completely caught up on concept reviews!

@@ -42,7 +42,7 @@ export default function ExamReadiness({ courseId }) {
   const colors = getGradientColors(pct);
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-ink-100 bg-gradient-to-b from-white via-paper/40 to-white p-6 shadow-sm transition hover:shadow-md">
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-ink-100 bg-gradient-to-b from-white via-paper/40 to-white dark:from-[#1b233a] dark:via-[#161e33] dark:to-[#1b233a] dark:border-[#273352] p-6 shadow-sm transition hover:shadow-md">
       <div className="flex items-center justify-between">
         <div>
           <span className="text-xs font-semibold uppercase tracking-wider text-ink-400">Target Readiness</span>

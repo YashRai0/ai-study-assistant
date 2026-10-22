@@ -43,12 +43,13 @@ export default function KnowledgeMap({ courseId }) {
 
   const loadData = useCallback((signal) => {
     if (!courseId) return;
+    const abortSignal = signal instanceof AbortSignal ? signal : undefined;
     setLoading(true);
 
     Promise.all([
-      client.get(`/learning/courses/${courseId}/concepts`, signal ? { signal } : {}),
-      client.get(`/learning/courses/${courseId}/mastery`, signal ? { signal } : {}),
-      client.get(`/learning/courses/${courseId}/misconceptions`, signal ? { signal } : {}).catch(() => ({ data: { misconceptions: [] } })),
+      client.get(`/learning/courses/${courseId}/concepts`, abortSignal ? { signal: abortSignal } : {}),
+      client.get(`/learning/courses/${courseId}/mastery`, abortSignal ? { signal: abortSignal } : {}),
+      client.get(`/learning/courses/${courseId}/misconceptions`, abortSignal ? { signal: abortSignal } : {}).catch(() => ({ data: { misconceptions: [] } })),
     ])
       .then(([{ data: c }, { data: m }, { data: misc }]) => {
         setConcepts(c.concepts || []);
@@ -66,11 +67,11 @@ export default function KnowledgeMap({ courseId }) {
         setMisconceptions(miscMap);
       })
       .catch((err) => {
-        if (signal?.aborted) return;
+        if (abortSignal?.aborted) return;
         console.error("Error loading knowledge map:", err);
       })
       .finally(() => {
-        if (!signal?.aborted) {
+        if (!abortSignal?.aborted) {
           setLoading(false);
         }
       });
@@ -200,14 +201,14 @@ export default function KnowledgeMap({ courseId }) {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* View Mode Segmented Control */}
-          <div className="inline-flex rounded-xl border border-ink-200 bg-ink-50/70 p-1 text-xs font-semibold shadow-2xs">
+          <div className="inline-flex rounded-xl border border-ink-200 bg-ink-50/70 dark:bg-[#131a2c] dark:border-[#273352] p-1 text-xs font-semibold shadow-2xs">
             <button
               type="button"
               onClick={() => setViewMode("grid")}
               className={`rounded-lg px-3 py-1 transition ${
                 viewMode === "grid"
-                  ? "bg-white text-ink-900 shadow-2xs"
-                  : "text-ink-600 hover:text-ink-900"
+                  ? "bg-white text-ink-900 dark:bg-[#25304e] dark:text-white shadow-2xs"
+                  : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
               }`}
             >
               ⊞ Grid
@@ -217,8 +218,8 @@ export default function KnowledgeMap({ courseId }) {
               onClick={() => setViewMode("graph")}
               className={`rounded-lg px-3 py-1 transition ${
                 viewMode === "graph"
-                  ? "bg-white text-ink-900 shadow-2xs"
-                  : "text-ink-600 hover:text-ink-900"
+                  ? "bg-white text-ink-900 dark:bg-[#25304e] dark:text-white shadow-2xs"
+                  : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
               }`}
             >
               🔀 Visual Flow
@@ -312,8 +313,8 @@ export default function KnowledgeMap({ courseId }) {
               onClick={() => setFilterMode("all")}
               className={`rounded-full px-3 py-1 font-semibold transition ${
                 filterMode === "all"
-                  ? "bg-ink-900 text-paper shadow-2xs"
-                  : "border border-ink-200 bg-white text-ink-600 hover:bg-ink-50"
+                  ? "bg-ink-900 text-paper shadow-2xs dark:bg-ink-100 dark:text-ink-900"
+                  : "border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 dark:bg-[#1b233a] dark:text-ink-300 dark:border-[#273352] dark:hover:bg-[#25304e]"
               }`}
             >
               All ({counts.all})
@@ -324,8 +325,8 @@ export default function KnowledgeMap({ courseId }) {
               onClick={() => setFilterMode("ready")}
               className={`rounded-full px-3 py-1 font-semibold transition ${
                 filterMode === "ready"
-                  ? "bg-indigo-900 text-paper shadow-2xs"
-                  : "border border-indigo-200 bg-indigo-50/60 text-indigo-800 hover:bg-indigo-100"
+                  ? "bg-indigo-900 text-paper shadow-2xs dark:bg-indigo-600 dark:text-white"
+                  : "border border-indigo-200 bg-indigo-50/60 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-800/40 dark:text-indigo-300"
               }`}
             >
               Ready to Learn ({counts.ready})
@@ -336,8 +337,8 @@ export default function KnowledgeMap({ courseId }) {
               onClick={() => setFilterMode("blocked")}
               className={`rounded-full px-3 py-1 font-semibold transition ${
                 filterMode === "blocked"
-                  ? "bg-amber-800 text-white shadow-2xs"
-                  : "border border-amber-200 bg-amber-50/60 text-amber-800 hover:bg-amber-100"
+                  ? "bg-amber-800 text-white shadow-2xs dark:bg-amber-600 dark:text-white"
+                  : "border border-amber-200 bg-amber-50/60 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/30 dark:border-amber-800/40 dark:text-amber-300"
               }`}
             >
               Blocked Prereqs ({counts.blocked})
@@ -349,8 +350,8 @@ export default function KnowledgeMap({ courseId }) {
                 onClick={() => setFilterMode("misconceptions")}
                 className={`rounded-full px-3 py-1 font-semibold transition ${
                   filterMode === "misconceptions"
-                    ? "bg-rose-700 text-white shadow-2xs"
-                    : "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                    ? "bg-rose-700 text-white shadow-2xs dark:bg-rose-600"
+                    : "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:border-rose-800/40 dark:text-rose-300"
                 }`}
               >
                 ⚠️ Misconceptions ({counts.misconceptions})
@@ -362,8 +363,8 @@ export default function KnowledgeMap({ courseId }) {
               onClick={() => setFilterMode("mastered")}
               className={`rounded-full px-3 py-1 font-semibold transition ${
                 filterMode === "mastered"
-                  ? "bg-emerald-800 text-white shadow-2xs"
-                  : "border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                  ? "bg-emerald-800 text-white shadow-2xs dark:bg-emerald-600"
+                  : "border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-800/40 dark:text-emerald-300"
               }`}
             >
               Mastered ({counts.mastered})
@@ -389,7 +390,7 @@ export default function KnowledgeMap({ courseId }) {
                     <div
                       key={c._id}
                       onClick={() => setSelected(isSelected ? null : c._id)}
-                      className={`cursor-pointer rounded-xl border border-ink-100 bg-white p-3.5 transition-all hover:border-ink-200 hover:shadow-xs ${
+                      className={`cursor-pointer rounded-xl border border-ink-100 bg-white dark:bg-[#182035] dark:border-[#273352] p-3.5 transition-all hover:border-ink-200 dark:hover:border-[#384872] hover:shadow-xs ${
                         isSelected ? "ring-2 ring-indigo-500/30 border-indigo-200 md:col-span-2 shadow-sm" : ""
                       }`}
                       style={{ borderLeftColor: getMasteryColor(c._id), borderLeftWidth: "4px" }}
@@ -399,12 +400,12 @@ export default function KnowledgeMap({ courseId }) {
                           <div className="flex flex-wrap items-center gap-1.5">
                             <p className="truncate font-semibold text-ink-900 text-sm">{c.name}</p>
                             {c.isBlocked && (
-                              <span className="rounded-md bg-amber-100/90 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                              <span className="rounded-md bg-amber-100/90 dark:bg-amber-950/40 dark:text-amber-300 dark:border dark:border-amber-800/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
                                 Prereq Blocked
                               </span>
                             )}
                             {activeMisconception && (
-                              <span className="rounded-md bg-rose-100/90 px-1.5 py-0.5 text-[10px] font-bold text-rose-800">
+                              <span className="rounded-md bg-rose-100/90 dark:bg-rose-950/40 dark:text-rose-300 dark:border dark:border-rose-800/40 px-1.5 py-0.5 text-[10px] font-bold text-rose-800">
                                 ⚠️ Misconception
                               </span>
                             )}

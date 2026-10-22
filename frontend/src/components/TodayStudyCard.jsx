@@ -82,7 +82,7 @@ export default function TodayStudyCard({ courseId, courseTitle }) {
   const masteryPct = concept ? Math.round((concept.mastery || 0) * 100) : 0;
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-ink-100 bg-gradient-to-br from-white via-paper to-white p-6 shadow-sm sm:p-7">
+    <section className="relative h-full flex flex-col justify-between overflow-hidden rounded-2xl border border-ink-100 bg-gradient-to-br from-white via-paper to-white p-6 shadow-sm sm:p-7">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="max-w-xl space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">
